@@ -5,7 +5,7 @@ This document explains the role and usage of AI tools during the architectural d
 ---
 
 ## 1. AI Tool Used
-- **Primary Tool**: Google DeepMind Antigravity AI Pair Programmer (Gemini 3.8 Flash Engine).
+- **Primary Tool**: Google DeepMind Antigravity (Gemini 3.8 Flash Engine),chatGPT,claude sonnet.
 - **Environment**: Antigravity IDE on Windows 11.
 
 ---
