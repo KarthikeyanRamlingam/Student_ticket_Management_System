@@ -1,6 +1,6 @@
 import React from 'react';
 import { Priority } from '../types';
-import { AlertCircle, AlertTriangle, ArrowDown, Flame } from 'lucide-react';
+import { ArrowDown, Minus, ArrowUp, Zap } from 'lucide-react';
 
 interface Props {
   priority: Priority;
@@ -14,40 +14,40 @@ export function PriorityBadge({ priority, size = 'md' }: Props) {
   > = {
     LOW: {
       label: 'Low',
-      bg: 'bg-slate-50',
+      bg: 'bg-slate-100/90',
       text: 'text-slate-700',
       border: 'border-slate-200',
-      icon: <ArrowDown className={size === 'sm' ? 'w-3 h-3' : 'w-3.5 h-3.5'} />
+      icon: <ArrowDown className={size === 'sm' ? 'w-3 h-3 text-slate-500' : 'w-3.5 h-3.5 text-slate-500'} />
     },
     MEDIUM: {
       label: 'Medium',
-      bg: 'bg-blue-50',
-      text: 'text-blue-700',
-      border: 'border-blue-200',
-      icon: <AlertCircle className={size === 'sm' ? 'w-3 h-3' : 'w-3.5 h-3.5'} />
+      bg: 'bg-sky-50',
+      text: 'text-sky-800',
+      border: 'border-sky-200',
+      icon: <Minus className={size === 'sm' ? 'w-3 h-3 text-sky-600' : 'w-3.5 h-3.5 text-sky-600'} />
     },
     HIGH: {
       label: 'High',
       bg: 'bg-amber-50',
-      text: 'text-amber-700',
+      text: 'text-amber-800',
       border: 'border-amber-200',
-      icon: <AlertTriangle className={size === 'sm' ? 'w-3 h-3' : 'w-3.5 h-3.5'} />
+      icon: <ArrowUp className={size === 'sm' ? 'w-3 h-3 text-amber-600' : 'w-3.5 h-3.5 text-amber-600'} />
     },
     URGENT: {
       label: 'Urgent',
-      bg: 'bg-red-50',
-      text: 'text-red-700',
-      border: 'border-red-200',
-      icon: <Flame className={size === 'sm' ? 'w-3 h-3 text-red-600' : 'w-3.5 h-3.5 text-red-600'} />
+      bg: 'bg-rose-50',
+      text: 'text-rose-800',
+      border: 'border-rose-200',
+      icon: <Zap className={size === 'sm' ? 'w-3 h-3 text-rose-600 fill-rose-600' : 'w-3.5 h-3.5 text-rose-600 fill-rose-600'} />
     }
   };
 
   const config = configs[priority] || configs.MEDIUM;
-  const padding = size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-2.5 py-1 text-xs font-semibold';
+  const padding = size === 'sm' ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-xs';
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-md border ${config.bg} ${config.text} ${config.border} ${padding}`}
+      className={`inline-flex items-center gap-1.5 font-semibold rounded-lg border shadow-xs ${config.bg} ${config.text} ${config.border} ${padding}`}
     >
       {config.icon}
       <span>{config.label}</span>

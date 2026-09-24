@@ -8,8 +8,23 @@ import { Ticket, Category } from '../../types';
 import { Navbar } from '../../components/Navbar';
 import { Sidebar } from '../../components/Sidebar';
 import { TicketListTable } from '../../components/TicketListTable';
+import { TicketKanbanBoard } from '../../components/TicketKanbanBoard';
 import { CreateTicketModal } from '../../components/CreateTicketModal';
-import { Search, RotateCcw, PlusCircle, Loader2 } from 'lucide-react';
+import {
+  Search,
+  RotateCcw,
+  PlusCircle,
+  Loader2,
+  LayoutGrid,
+  List,
+  Filter,
+  Flame,
+  UserCheck,
+  Inbox,
+  ClockAlert,
+  Sparkles,
+  X
+} from 'lucide-react';
 
 function TicketsContent() {
   const router = useRouter();
@@ -20,6 +35,9 @@ function TicketsContent() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // View Mode: table vs kanban
+  const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
 
   // Filters state
   const [search, setSearch] = useState(searchParams.get('search') || '');
@@ -62,7 +80,7 @@ function TicketsContent() {
         sortBy,
         sortOrder,
         page,
-        limit: 10
+        limit: viewMode === 'kanban' ? 50 : 10
       });
 
       setTickets(res.data);
@@ -75,7 +93,7 @@ function TicketsContent() {
     } finally {
       setLoading(false);
     }
-  }, [user, search, status, priority, categoryId, slaStatus, assignedStaffId, sortBy, sortOrder, page]);
+  }, [user, search, status, priority, categoryId, slaStatus, assignedStaffId, sortBy, sortOrder, page, viewMode]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -99,6 +117,10 @@ function TicketsContent() {
     setPage(1);
   };
 
+  const hasActiveFilters = Boolean(
+    search || status || priority || categoryId || slaStatus || assignedStaffId
+  );
+
   if (authLoading || !user) {
     return (
       <div className="flex-1 flex items-center justify-center p-12">
@@ -109,32 +131,157 @@ function TicketsContent() {
 
   return (
     <main className="flex-1 p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+      {/* Header Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-            {user.role === 'STUDENT' ? 'My Support Requests' : 'Central Ticket Management Queue'}
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">
+              {user.role === 'STUDENT' ? 'My Support Requests' : 'Central Ticket Management Center'}
+            </h1>
+            <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+              {totalCount} Total
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 font-medium mt-1">
             {user.role === 'STUDENT'
-              ? 'Track the progress of your submitted queries, verify SLA timers, and provide follow-up information.'
-              : 'Manage, claim, assign, and resolve campus administrative requests across all academic departments.'}
+              ? 'Real-time visibility into your administrative inquiries, SLA timers, and staff communication.'
+              : 'Triage, claim, re-assign, and resolve student support cases under institutional SLA guidelines.'}
           </p>
         </div>
 
-        {user.role === 'STUDENT' && (
+        <div className="flex items-center gap-3">
+          {/* View Toggle: Table vs Kanban */}
+          <div className="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200/80 shadow-2xs">
+            <button
+              onClick={() => setViewMode('table')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                viewMode === 'table'
+                  ? 'bg-white text-indigo-700 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+              title="Table View"
+            >
+              <List className="w-4 h-4" />
+              <span>Grid</span>
+            </button>
+            <button
+              onClick={() => setViewMode('kanban')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                viewMode === 'kanban'
+                  ? 'bg-white text-indigo-700 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+              title="Kanban Board View"
+            >
+              <LayoutGrid className="w-4 h-4" />
+              <span>Kanban</span>
+            </button>
+          </div>
+
+          {user.role === 'STUDENT' && (
+            <button
+              onClick={() => setCreateModalOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs flex items-center gap-2 shadow-md shadow-indigo-600/20 hover:shadow-indigo-600/35 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>+ New Ticket</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Filter Chips Bar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          onClick={() => {
+            handleResetFilters();
+          }}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+            !hasActiveFilters
+              ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+              : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          All Tickets
+        </button>
+
+        <button
+          onClick={() => {
+            setPriority('URGENT');
+            setPage(1);
+          }}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+            priority === 'URGENT'
+              ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+              : 'bg-white text-rose-700 border-rose-200 hover:bg-rose-50'
+          }`}
+        >
+          <Flame className="w-3.5 h-3.5" />
+          <span>Urgent Priority</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setSlaStatus('OVERDUE');
+            setPage(1);
+          }}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+            slaStatus === 'OVERDUE'
+              ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+              : 'bg-white text-amber-700 border-amber-200 hover:bg-amber-50'
+          }`}
+        >
+          <ClockAlert className="w-3.5 h-3.5" />
+          <span>SLA Overdue</span>
+        </button>
+
+        {user.role === 'STAFF' && (
+          <>
+            <button
+              onClick={() => {
+                setAssignedStaffId('me');
+                setPage(1);
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                assignedStaffId === 'me'
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                  : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50'
+              }`}
+            >
+              <UserCheck className="w-3.5 h-3.5" />
+              <span>Assigned To Me</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setAssignedStaffId('unassigned');
+                setPage(1);
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                assignedStaffId === 'unassigned'
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <Inbox className="w-3.5 h-3.5" />
+              <span>Unclaimed Queue</span>
+            </button>
+          </>
+        )}
+
+        {hasActiveFilters && (
           <button
-            onClick={() => setCreateModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs flex items-center gap-2 shadow-md shadow-indigo-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            onClick={handleResetFilters}
+            className="flex items-center gap-1 text-xs font-semibold text-slate-400 hover:text-rose-600 ml-auto transition-colors"
           >
-            <PlusCircle className="w-4 h-4" />
-            <span>+ Create New Ticket</span>
+            <X className="w-3.5 h-3.5" />
+            <span>Clear Filters</span>
           </button>
         )}
       </div>
 
-      {/* Search & Filters Bar */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+      {/* Advanced Filter Controls Bar */}
+      <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row gap-3">
           {/* Search Box */}
           <div className="relative flex-1">
@@ -147,11 +294,22 @@ function TicketsContent() {
                 setPage(1);
               }}
               placeholder="Search by ticket # (TKT-2026-xxxxx), subject, or student name..."
-              className="w-full pl-10 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+              className="w-full pl-10 pr-4 py-2.5 text-xs font-medium text-slate-900 bg-slate-50 border border-slate-200/80 rounded-2xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all placeholder:text-slate-400"
             />
+            {search && (
+              <button
+                onClick={() => {
+                  setSearch('');
+                  setPage(1);
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
-          {/* Sort By */}
+          {/* Sort Control */}
           <div className="flex items-center gap-2">
             <select
               value={sortBy}
@@ -159,38 +317,52 @@ function TicketsContent() {
                 setSortBy(e.target.value);
                 setPage(1);
               }}
-              className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
             >
-              <option value="createdAt">Sort: Created Date</option>
-              <option value="slaDueAt">Sort: SLA Due Date</option>
-              <option value="priority">Sort: Priority Level</option>
-              <option value="status">Sort: Status</option>
-              <option value="ticketNumber">Sort: Ticket ID</option>
+              <option value="createdAt">Date Created</option>
+              <option value="updatedAt">Last Activity</option>
+              <option value="priority">Priority</option>
+              <option value="slaTargetHours">SLA Target</option>
             </select>
 
             <button
-              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-semibold hover:bg-slate-100 transition-colors"
-              title="Toggle Ascending / Descending"
+              onClick={() => {
+                setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                setPage(1);
+              }}
+              className="px-3 py-2 text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors"
+              title="Toggle Sort Order"
             >
-              {sortOrder === 'asc' ? '↑ Asc' : '↓ Desc'}
-            </button>
-
-            <button
-              onClick={handleResetFilters}
-              className="px-3 py-2 text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl flex items-center gap-1 transition-colors font-semibold"
-              title="Reset all filters"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Reset</span>
+              {sortOrder === 'desc' ? 'Desc ↓' : 'Asc ↑'}
             </button>
           </div>
         </div>
 
-        {/* Filter Dropdowns Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-3 border-t border-slate-100">
+        {/* Category & Status Filter Selectors */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-slate-100">
           <div>
-            <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              Category
+            </label>
+            <select
+              value={categoryId}
+              onChange={(e) => {
+                setCategoryId(e.target.value);
+                setPage(1);
+              }}
+              className="w-full px-2.5 py-1.5 text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+            >
+              <option value="">All Categories</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
               Status
             </label>
             <select
@@ -199,7 +371,7 @@ function TicketsContent() {
                 setStatus(e.target.value);
                 setPage(1);
               }}
-              className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-full px-2.5 py-1.5 text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
             >
               <option value="">All Statuses</option>
               <option value="OPEN">Open</option>
@@ -213,7 +385,7 @@ function TicketsContent() {
           </div>
 
           <div>
-            <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
               Priority
             </label>
             <select
@@ -222,40 +394,19 @@ function TicketsContent() {
                 setPriority(e.target.value);
                 setPage(1);
               }}
-              className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-full px-2.5 py-1.5 text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
             >
               <option value="">All Priorities</option>
-              <option value="LOW">Low (72h)</option>
-              <option value="MEDIUM">Medium (48h)</option>
-              <option value="HIGH">High (24h)</option>
-              <option value="URGENT">Urgent (8h)</option>
+              <option value="LOW">Low</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="HIGH">High</option>
+              <option value="URGENT">Urgent</option>
             </select>
           </div>
 
           <div>
-            <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
-              Category
-            </label>
-            <select
-              value={categoryId}
-              onChange={(e) => {
-                setCategoryId(e.target.value);
-                setPage(1);
-              }}
-              className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            >
-              <option value="">All Categories</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
-              SLA Status
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              SLA Health
             </label>
             <select
               value={slaStatus}
@@ -263,54 +414,48 @@ function TicketsContent() {
                 setSlaStatus(e.target.value);
                 setPage(1);
               }}
-              className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-full px-2.5 py-1.5 text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
             >
-              <option value="">All SLA States</option>
+              <option value="">All SLA Statuses</option>
               <option value="WITHIN_SLA">Within SLA (On Track)</option>
-              <option value="DUE_SOON">Due Soon (Warning)</option>
-              <option value="OVERDUE">Overdue (Breached)</option>
-              <option value="MET">Resolved within SLA</option>
-              <option value="BREACHED">Resolved Past SLA</option>
+              <option value="DUE_SOON">Due Soon (&lt; 25% Time Left)</option>
+              <option value="OVERDUE">Overdue (Active Breach)</option>
+              <option value="MET">SLA Met (Resolved in Time)</option>
+              <option value="BREACHED">Breached (Resolved Late)</option>
             </select>
           </div>
-
-          {user.role !== 'STUDENT' && (
-            <div>
-              <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
-                Ownership
-              </label>
-              <select
-                value={assignedStaffId}
-                onChange={(e) => {
-                  setAssignedStaffId(e.target.value);
-                  setPage(1);
-                }}
-                className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              >
-                <option value="">All Ownerships</option>
-                <option value="me">Assigned to Me</option>
-                <option value="unassigned">Unassigned Only</option>
-              </select>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Ticket Table */}
-      <TicketListTable
-        tickets={tickets}
-        role={user.role}
-        loading={loading}
-        page={page}
-        totalPages={totalPages}
-        totalCount={totalCount}
-        onPageChange={(newPage) => setPage(newPage)}
-      />
+      {error && (
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between shadow-xs">
+          <span>{error}</span>
+          <button onClick={loadTickets} className="underline font-bold text-rose-900">
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* Main Content: Table or Kanban */}
+      {viewMode === 'table' ? (
+        <TicketListTable
+          tickets={tickets}
+          role={user.role}
+          loading={loading}
+          page={page}
+          totalPages={totalPages}
+          totalCount={totalCount}
+          onPageChange={(newPage) => setPage(newPage)}
+        />
+      ) : (
+        <TicketKanbanBoard tickets={tickets} role={user.role} loading={loading} />
+      )}
 
       <CreateTicketModal
         isOpen={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
         onTicketCreated={() => {
+          setCreateModalOpen(false);
           loadTickets();
         }}
       />
@@ -320,15 +465,17 @@ function TicketsContent() {
 
 export default function TicketsPage() {
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       <Navbar />
       <div className="flex flex-1">
         <Sidebar />
-        <Suspense fallback={
-          <div className="flex-1 flex items-center justify-center p-12">
-            <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
-          </div>
-        }>
+        <Suspense
+          fallback={
+            <div className="flex-1 flex items-center justify-center p-12">
+              <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+            </div>
+          }
+        >
           <TicketsContent />
         </Suspense>
       </div>

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 import { Category, Priority, Ticket } from '../types';
 import { X, Upload, AlertCircle, Loader2 } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 interface Props {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export function CreateTicketModal({ isOpen, onClose, onTicketCreated }: Props) {
+  const { success } = useToast();
   const [categories, setCategories] = useState<Category[]>([]);
   const [title, setTitle] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -80,6 +82,7 @@ export function CreateTicketModal({ isOpen, onClose, onTicketCreated }: Props) {
       }
 
       const res = await api.post<Ticket>('/tickets', formData);
+      success('Support Ticket Created', `Ticket ${res.data.ticketNumber} submitted successfully.`);
       onTicketCreated(res.data);
       // Reset form
       setTitle('');

@@ -21,7 +21,16 @@ import {
   PlusCircle,
   ArrowRight,
   Zap,
-  Loader2
+  TrendingUp,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  Building2,
+  ExternalLink,
+  Flame,
+  Activity,
+  Calendar,
+  Check
 } from 'lucide-react';
 import {
   BarChart,
@@ -43,12 +52,15 @@ export default function DashboardPage() {
 
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [timeRange, setTimeRange] = useState<'7d' | '30d' | 'all'>('7d');
 
-  const loadDashboard = useCallback(async () => {
+  const loadDashboard = useCallback(async (isRefresh = false) => {
     if (!user) return;
-    setLoading(true);
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
     setError(null);
     try {
       let endpoint = '/analytics/student';
@@ -61,6 +73,7 @@ export default function DashboardPage() {
       setError(err.message || 'Failed to load dashboard metrics.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [user]);
 
@@ -79,70 +92,122 @@ export default function DashboardPage() {
   if (authLoading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs font-semibold text-slate-500">Loading CampusResolve...</p>
+        </div>
       </div>
     );
   }
 
-  const COLORS = ['#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#f43f5e'];
+  const CHART_COLORS = ['#4f46e5', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#f43f5e'];
+
+  const CustomChartTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-slate-900 text-white p-3 rounded-xl shadow-xl border border-slate-700 text-xs">
+          <p className="font-bold text-slate-200 mb-1">{label || payload[0].name}</p>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: payload[0].color || '#6366f1' }} />
+            <span className="text-slate-400">Count:</span>
+            <span className="font-mono font-bold text-white">{payload[0].value} tickets</span>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      <Navbar />
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
+      <Navbar onOpenCreateModal={() => setCreateModalOpen(true)} />
 
       <div className="flex flex-1">
         <Sidebar onOpenCreateModal={() => setCreateModalOpen(true)} />
 
         <main className="flex-1 p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-                  Welcome back, {user.name}
-                </h1>
-                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                  {user.role}
+          {/* Executive Control Header */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 bg-white rounded-3xl border border-slate-200/80 shadow-xs relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-indigo-50/60 to-transparent rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+            
+            <div className="relative z-10">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100">
+                  {user.role === 'STUDENT' ? 'Student Workspace' : user.role === 'STAFF' ? 'Operational Dispatch' : 'Executive Command'}
+                </span>
+                <span className="text-slate-300">•</span>
+                <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
+                  <Activity className="w-3.5 h-3.5 text-emerald-500" />
+                  SLA Engine Online
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-1">
+              <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mt-1.5">
+                {user.role === 'STUDENT' ? `Welcome, ${user.name}` : `Executive Dashboard • ${user.name}`}
+              </h1>
+              <p className="text-xs text-slate-500 font-medium mt-1">
                 {user.role === 'STUDENT'
-                  ? `Student ID: ${user.studentIdNumber || 'STU-2024'} • Manage your requests and track SLA deadlines.`
+                  ? `Student ID: ${user.studentIdNumber || 'STU-2024'} • Instant tracking of administrative inquiries and resolution progress.`
                   : user.role === 'STAFF'
-                  ? `Department: ${user.department?.name || 'General Support'} • Assigned queue and resolution workflows.`
-                  : 'Executive overview, SLA compliance monitoring, and department workload analytics.'}
+                  ? `Department: ${user.department?.name || 'Institutional Operations'} • Real-time queue claiming and SLA compliance.`
+                  : 'Institutional oversight, SLA compliance metrics, and cross-departmental workload distribution.'}
               </p>
             </div>
 
-            {user.role === 'STUDENT' && (
+            <div className="flex items-center gap-2.5 relative z-10">
+              {/* Refresh Sync Button */}
               <button
-                onClick={() => setCreateModalOpen(true)}
-                className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs flex items-center gap-2 shadow-md shadow-indigo-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                onClick={() => loadDashboard(true)}
+                disabled={refreshing}
+                className="p-2.5 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 border border-slate-200/80 rounded-xl transition-all shadow-xs disabled:opacity-50"
+                title="Refresh metrics sync"
               >
-                <PlusCircle className="w-4 h-4" />
-                <span>+ Create New Ticket</span>
+                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-indigo-600' : ''}`} />
               </button>
-            )}
+
+              {user.role === 'STUDENT' ? (
+                <button
+                  onClick={() => setCreateModalOpen(true)}
+                  className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs flex items-center gap-2 shadow-md shadow-indigo-600/20 hover:shadow-indigo-600/35 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>Submit Support Ticket</span>
+                </button>
+              ) : (
+                <Link
+                  href="/tickets"
+                  className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs flex items-center gap-2 shadow-md shadow-slate-900/10 transition-all hover:scale-[1.02]"
+                >
+                  <TicketIcon className="w-4 h-4 text-indigo-400" />
+                  <span>View Full Queue</span>
+                </Link>
+              )}
+            </div>
           </div>
 
           {error && (
-            <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center justify-between">
-              <span>{error}</span>
-              <button onClick={loadDashboard} className="underline font-semibold">
-                Retry
+            <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between shadow-xs">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{error}</span>
+              </div>
+              <button onClick={() => loadDashboard()} className="underline font-bold text-rose-900 hover:text-rose-950">
+                Retry Connection
               </button>
             </div>
           )}
 
-          {/* Loading Skeleton */}
+          {/* Loading Skeletons */}
           {loading && !data && (
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="h-24 bg-white rounded-2xl border border-slate-200 animate-pulse" />
+                  <div key={i} className="h-28 bg-white rounded-3xl border border-slate-200/80 animate-pulse" />
                 ))}
               </div>
-              <div className="h-64 bg-white rounded-2xl border border-slate-200 animate-pulse" />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="h-72 bg-white rounded-3xl border border-slate-200/80 animate-pulse" />
+                <div className="h-72 bg-white rounded-3xl border border-slate-200/80 animate-pulse" />
+              </div>
             </div>
           )}
 
@@ -150,26 +215,28 @@ export default function DashboardPage() {
           {/* 1. STUDENT VIEW                                                */}
           {/* ============================================================== */}
           {user.role === 'STUDENT' && data?.cards && (
-            <div className="space-y-6">
-              {/* Action Required Alert Banner */}
+            <div className="space-y-6 animate-in fade-in duration-300">
+              {/* Action Required Banner */}
               {data.actionRequired && data.actionRequired.length > 0 && (
-                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex items-start gap-3 shadow-sm animate-in fade-in">
-                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <h2 className="text-sm font-bold">Action Required: Staff requested information</h2>
-                    <p className="text-xs text-amber-800 mt-0.5">
-                      You have {data.actionRequired.length} ticket(s) waiting for your response before processing can resume.
+                <div className="p-5 rounded-3xl bg-amber-50/90 border border-amber-200 text-amber-950 flex items-start gap-3.5 shadow-sm">
+                  <div className="p-2 rounded-xl bg-amber-100 text-amber-800 shrink-0">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-bold">Action Required: Clarification Requested by Campus Staff</h3>
+                    <p className="text-xs text-amber-800/90 mt-0.5">
+                      Our staff is waiting on additional documents or details from you to continue processing your tickets.
                     </p>
-                    <div className="mt-2 flex flex-wrap gap-2">
+                    <div className="mt-3 flex flex-wrap gap-2">
                       {data.actionRequired.map((t: any) => (
                         <Link
                           key={t.id}
                           href={`/tickets/${t.id}`}
-                          className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-amber-100 rounded-lg text-xs font-semibold text-amber-900 border border-amber-300 transition-colors"
+                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-amber-300 text-xs font-bold text-amber-900 hover:bg-amber-100 transition-colors shadow-xs"
                         >
-                          <span className="font-mono">{t.ticketNumber}</span>
-                          <span>• {t.title}</span>
-                          <ArrowRight className="w-3 h-3" />
+                          <span className="font-mono text-amber-700">{t.ticketNumber}</span>
+                          <span className="truncate max-w-[200px]">{t.title}</span>
+                          <ArrowRight className="w-3.5 h-3.5 text-amber-600" />
                         </Link>
                       ))}
                     </div>
@@ -177,104 +244,112 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {/* Student Stat Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-                <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
+              {/* Student KPI Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs card-hover">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-500">Total Tickets</span>
-                    <TicketIcon className="w-4 h-4 text-indigo-500" />
+                    <span className="text-xs font-semibold text-slate-500">Total Submitted</span>
+                    <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
+                      <TicketIcon className="w-4 h-4" />
+                    </div>
                   </div>
-                  <div className="text-2xl font-bold text-slate-900 mt-2">{data.cards?.total ?? 0}</div>
-                </div>
-                <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-500">Open</span>
-                    <Clock className="w-4 h-4 text-blue-500" />
+                  <div className="text-3xl font-extrabold text-slate-900 font-mono mt-2 tracking-tight">
+                    {data.cards.totalTickets}
                   </div>
-                  <div className="text-2xl font-bold text-blue-600 mt-2">{data.cards?.open ?? 0}</div>
+                  <span className="text-[11px] font-medium text-slate-400 mt-1 block">Lifetime tickets</span>
                 </div>
-                <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
+
+                <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs card-hover">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-slate-500">In Progress</span>
-                    <PlayCircle className="w-4 h-4 text-amber-500" />
+                    <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                      <PlayCircle className="w-4 h-4" />
+                    </div>
                   </div>
-                  <div className="text-2xl font-bold text-amber-600 mt-2">{data.cards?.inProgress ?? 0}</div>
+                  <div className="text-3xl font-extrabold text-indigo-600 font-mono mt-2 tracking-tight">
+                    {data.cards.activeTickets}
+                  </div>
+                  <span className="text-[11px] font-semibold text-indigo-600/80 mt-1 block">Being worked on</span>
                 </div>
-                <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
+
+                <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs card-hover">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-500">Waiting for Me</span>
-                    <HelpCircle className="w-4 h-4 text-purple-500" />
+                    <span className="text-xs font-semibold text-slate-500">Awaiting Info</span>
+                    <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
+                      <HelpCircle className="w-4 h-4" />
+                    </div>
                   </div>
-                  <div className="text-2xl font-bold text-purple-600 mt-2">{data.cards?.waitingForMe ?? 0}</div>
+                  <div className="text-3xl font-extrabold text-amber-600 font-mono mt-2 tracking-tight">
+                    {data.cards.waitingForStudent}
+                  </div>
+                  <span className="text-[11px] font-semibold text-amber-600/80 mt-1 block">Requires your reply</span>
                 </div>
-                <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
+
+                <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs card-hover">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-slate-500">Resolved</span>
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
                   </div>
-                  <div className="text-2xl font-bold text-emerald-600 mt-2">{data.cards?.resolved ?? 0}</div>
+                  <div className="text-3xl font-extrabold text-emerald-600 font-mono mt-2 tracking-tight">
+                    {data.cards.resolvedTickets}
+                  </div>
+                  <span className="text-[11px] font-semibold text-emerald-600/80 mt-1 block">Successfully closed</span>
                 </div>
               </div>
 
-              {/* Recent Tickets Table */}
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
-                <div className="flex items-center justify-between">
+              {/* Recent Student Tickets Table */}
+              <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
+                <div className="p-5 border-b border-slate-100 flex items-center justify-between">
                   <div>
-                    <h2 className="text-base font-bold text-slate-900">Recent Requests</h2>
-                    <p className="text-xs text-slate-500">Track current status and resolution SLAs</p>
+                    <h3 className="text-sm font-bold text-slate-900">Your Recent Inquiries</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">Click any ticket to inspect conversation thread or post replies</p>
                   </div>
                   <Link
                     href="/tickets"
-                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                    className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
                   >
-                    <span>View all my tickets</span>
+                    <span>View All Inquiries</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </Link>
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-100 text-slate-400 uppercase tracking-wider font-semibold">
-                        <th className="py-2.5 px-3">Ticket</th>
-                        <th className="py-2.5 px-3">Title</th>
-                        <th className="py-2.5 px-3">Priority</th>
-                        <th className="py-2.5 px-3">Status</th>
-                        <th className="py-2.5 px-3">SLA Status</th>
-                        <th className="py-2.5 px-3 text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-700">
-                      {(data.recentTickets || []).map((t: any) => (
-                        <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="py-3 px-3 font-mono font-bold text-indigo-600">
+                {data.recentTickets && data.recentTickets.length > 0 ? (
+                  <div className="divide-y divide-slate-100 overflow-x-auto">
+                    {data.recentTickets.map((t: any) => (
+                      <Link
+                        key={t.id}
+                        href={`/tickets/${t.id}`}
+                        className="flex items-center justify-between p-4 hover:bg-slate-50/80 transition-colors group"
+                      >
+                        <div className="flex items-center gap-4 min-w-0">
+                          <span className="font-mono text-xs font-bold text-indigo-600 group-hover:underline">
                             {t.ticketNumber}
-                          </td>
-                          <td className="py-3 px-3 font-medium text-slate-900 max-w-xs truncate">
-                            {t.title}
-                          </td>
-                          <td className="py-3 px-3">
-                            <PriorityBadge priority={t.priority} size="sm" />
-                          </td>
-                          <td className="py-3 px-3">
-                            <StatusBadge status={t.status} size="sm" />
-                          </td>
-                          <td className="py-3 px-3">
-                            <SlaBadge metrics={t.metrics} size="sm" />
-                          </td>
-                          <td className="py-3 px-3 text-right">
-                            <Link
-                              href={`/tickets/${t.id}`}
-                              className="text-indigo-600 font-semibold hover:underline"
-                            >
-                              Open Details
-                            </Link>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                          </span>
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-bold text-slate-900 truncate group-hover:text-indigo-600 transition-colors">
+                              {t.title}
+                            </h4>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                              {t.category?.name} • Dept: {t.category?.department?.name || 'General'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0">
+                          <PriorityBadge priority={t.priority} size="sm" />
+                          <StatusBadge status={t.status} size="sm" />
+                          {t.metrics && <SlaBadge metrics={t.metrics} size="sm" />}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-10 text-center text-xs text-slate-500">
+                    You haven't submitted any tickets yet. Click "Submit Support Ticket" above to get started.
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -283,306 +358,247 @@ export default function DashboardPage() {
           {/* 2. STAFF VIEW                                                  */}
           {/* ============================================================== */}
           {user.role === 'STAFF' && data?.cards && (
-            <div className="space-y-6">
-              {/* Staff Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                  <div className="text-xs font-semibold text-slate-500">Assigned to Me</div>
-                  <div className="text-2xl font-bold text-indigo-600 mt-2">{data.cards?.assignedToMe ?? 0}</div>
-                </div>
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                  <div className="text-xs font-semibold text-slate-500">In Progress</div>
-                  <div className="text-2xl font-bold text-amber-600 mt-2">{data.cards?.inProgress ?? 0}</div>
-                </div>
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                  <div className="text-xs font-semibold text-slate-500">Waiting for Student</div>
-                  <div className="text-2xl font-bold text-purple-600 mt-2">{data.cards?.waitingForStudent ?? 0}</div>
-                </div>
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                  <div className="text-xs font-semibold text-slate-500">Due Soon</div>
-                  <div className="text-2xl font-bold text-amber-700 mt-2">{data.cards?.dueSoon ?? 0}</div>
-                </div>
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                  <div className="text-xs font-semibold text-slate-500">Overdue</div>
-                  <div className="text-2xl font-bold text-rose-600 mt-2">{data.cards?.overdue ?? 0}</div>
-                </div>
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                  <div className="text-xs font-semibold text-slate-500">Unassigned Pool</div>
-                  <div className="text-2xl font-bold text-blue-600 mt-2">{data.cards?.unassignedCount ?? 0}</div>
-                </div>
-              </div>
-
-              {/* Urgent Queue */}
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Zap className="w-5 h-5 text-amber-500" />
-                    <div>
-                      <h2 className="text-base font-bold text-slate-900">Priority & Approaching SLA Queue</h2>
-                      <p className="text-xs text-slate-500">Tickets requiring urgent staff attention</p>
+            <div className="space-y-6 animate-in fade-in duration-300">
+              {/* Staff KPI Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs card-hover">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-500">Assigned To Me</span>
+                    <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                      <TicketIcon className="w-4 h-4" />
                     </div>
                   </div>
-                  <Link
-                    href="/tickets?priority=URGENT"
-                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
-                  >
-                    <span>View all priority queue</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </Link>
+                  <div className="text-3xl font-extrabold text-indigo-600 font-mono mt-2 tracking-tight">
+                    {data.cards.assignedToMe}
+                  </div>
+                  <span className="text-[11px] font-semibold text-slate-400 mt-1 block">Active desk queue</span>
                 </div>
 
-                {(!data.urgentQueue || data.urgentQueue.length === 0) ? (
-                  <p className="text-xs text-slate-400 py-4 text-center">No urgent tickets pending in your queue.</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead>
-                        <tr className="border-b border-slate-100 text-slate-400 uppercase tracking-wider font-semibold">
-                          <th className="py-2.5 px-3">Ticket</th>
-                          <th className="py-2.5 px-3">Title</th>
-                          <th className="py-2.5 px-3">Student</th>
-                          <th className="py-2.5 px-3">Priority</th>
-                          <th className="py-2.5 px-3">SLA Status</th>
-                          <th className="py-2.5 px-3 text-right">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-slate-700">
-                        {data.urgentQueue.map((t: any) => (
-                          <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                            <td className="py-3 px-3 font-mono font-bold text-indigo-600">
-                              {t.ticketNumber}
-                            </td>
-                            <td className="py-3 px-3 font-medium text-slate-900 max-w-xs truncate">
-                              {t.title}
-                            </td>
-                            <td className="py-3 px-3">{t.student?.name}</td>
-                            <td className="py-3 px-3">
-                              <PriorityBadge priority={t.priority} size="sm" />
-                            </td>
-                            <td className="py-3 px-3">
-                              <SlaBadge metrics={t.metrics} size="sm" />
-                            </td>
-                            <td className="py-3 px-3 text-right">
-                              <Link
-                                href={`/tickets/${t.id}`}
-                                className="px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 font-semibold hover:bg-indigo-100"
-                              >
-                                Work On Ticket
-                              </Link>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs card-hover">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-500">Department Pool</span>
+                    <div className="w-8 h-8 rounded-xl bg-sky-50 flex items-center justify-center text-sky-600">
+                      <Building2 className="w-4 h-4" />
+                    </div>
                   </div>
-                )}
+                  <div className="text-3xl font-extrabold text-slate-900 font-mono mt-2 tracking-tight">
+                    {data.cards.openInDepartment}
+                  </div>
+                  <span className="text-[11px] font-semibold text-sky-600/80 mt-1 block">Available to claim</span>
+                </div>
+
+                <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs card-hover">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-500">Urgent Attention</span>
+                    <div className="w-8 h-8 rounded-xl bg-rose-50 flex items-center justify-center text-rose-600">
+                      <Flame className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="text-3xl font-extrabold text-rose-600 font-mono mt-2 tracking-tight">
+                    {data.cards.urgentTickets}
+                  </div>
+                  <span className="text-[11px] font-semibold text-rose-600/80 mt-1 block">SLA risk / urgent</span>
+                </div>
+
+                <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs card-hover">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-500">Resolved (7 Days)</span>
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="text-3xl font-extrabold text-emerald-600 font-mono mt-2 tracking-tight">
+                    {data.cards.resolvedThisWeek}
+                  </div>
+                  <span className="text-[11px] font-semibold text-emerald-600/80 mt-1 block">Weekly velocity</span>
+                </div>
               </div>
+
+              {/* Urgent Operational Rail */}
+              {data.urgentTicketsList && data.urgentTicketsList.length > 0 && (
+                <div className="p-6 rounded-3xl bg-slate-900 text-white shadow-xl relative overflow-hidden border border-slate-800">
+                  <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+                    <div className="flex items-center gap-2.5">
+                      <span className="relative flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500" />
+                      </span>
+                      <h3 className="text-sm font-bold text-white tracking-wide">
+                        Urgent Attention Queue — Critical & SLA Escalations
+                      </h3>
+                    </div>
+                    <span className="text-xs text-slate-400 font-mono">
+                      {data.urgentTicketsList.length} Tickets Flagged
+                    </span>
+                  </div>
+
+                  <div className="divide-y divide-slate-800/80 mt-2">
+                    {data.urgentTicketsList.map((t: any) => (
+                      <div key={t.id} className="py-3.5 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <span className="font-mono text-xs font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/20 shrink-0">
+                            {t.ticketNumber}
+                          </span>
+                          <div className="truncate">
+                            <span className="text-xs font-bold text-slate-100">{t.title}</span>
+                            <span className="text-[11px] text-slate-400 block mt-0.5">
+                              Student: {t.student?.name} • Category: {t.category?.name}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0">
+                          {t.metrics && <SlaBadge metrics={t.metrics} size="sm" />}
+                          <Link
+                            href={`/tickets/${t.id}`}
+                            className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-900 text-xs font-bold transition-all shadow-xs"
+                          >
+                            Inspect & Claim
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
           {/* ============================================================== */}
-          {/* 3. ADMIN MANAGEMENT VIEW                                       */}
+          {/* 3. ADMIN / EXECUTIVE VIEW                                      */}
           {/* ============================================================== */}
-          {user.role === 'ADMIN' && data?.cards && data?.charts && (
-            <div className="space-y-6">
-              {/* Executive Stat Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4">
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                  <div className="text-xs font-semibold text-slate-500">Total Tickets</div>
-                  <div className="text-2xl font-bold text-slate-900 mt-2">{data.cards?.total ?? 0}</div>
-                </div>
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                  <div className="text-xs font-semibold text-slate-500">Open Tickets</div>
-                  <div className="text-2xl font-bold text-blue-600 mt-2">{data.cards?.open ?? 0}</div>
-                </div>
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                  <div className="text-xs font-semibold text-slate-500">Resolved</div>
-                  <div className="text-2xl font-bold text-emerald-600 mt-2">{data.cards?.resolved ?? 0}</div>
-                </div>
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                  <div className="text-xs font-semibold text-slate-500">Overdue</div>
-                  <div className="text-2xl font-bold text-rose-600 mt-2">{data.cards?.overdue ?? 0}</div>
-                </div>
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                  <div className="text-xs font-semibold text-slate-500">Unassigned</div>
-                  <div className="text-2xl font-bold text-amber-600 mt-2">{data.cards?.unassigned ?? 0}</div>
-                </div>
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                  <div className="text-xs font-semibold text-slate-500">SLA Compliance</div>
-                  <div className="text-2xl font-bold text-indigo-600 mt-2">{data.cards?.slaComplianceRate ?? 100}%</div>
-                </div>
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                  <div className="text-xs font-semibold text-slate-500">Avg Resolution</div>
-                  <div className="text-2xl font-bold text-slate-800 mt-2">{data.cards?.avgResolutionHours ?? 0}h</div>
-                </div>
-              </div>
-
-              {/* Management Analytics Charts Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Tickets by Category */}
-                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                  <div>
-                    <h2 className="text-sm font-bold text-slate-900">Tickets by Category</h2>
-                    <p className="text-xs text-slate-500">Distribution of complaints across campus services</p>
-                  </div>
-                  <div className="h-64 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={data.charts?.byCategory || []} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                        <XAxis
-                          dataKey="name"
-                          tick={{ fontSize: 10, fill: '#64748b' }}
-                          angle={-25}
-                          textAnchor="end"
-                          interval={0}
-                        />
-                        <YAxis tick={{ fontSize: 10, fill: '#64748b' }} />
-                        <Tooltip
-                          contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: 8, color: '#fff', fontSize: 12 }}
-                        />
-                        <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-
-                {/* Ageing Distribution */}
-                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                  <div>
-                    <h2 className="text-sm font-bold text-slate-900">Ageing Analysis (Open Tickets)</h2>
-                    <p className="text-xs text-slate-500">Unresolved ticket duration buckets</p>
-                  </div>
-                  <div className="h-64 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={data.charts?.ageingDistribution || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                        <XAxis dataKey="bucket" tick={{ fontSize: 11, fill: '#64748b' }} />
-                        <YAxis tick={{ fontSize: 11, fill: '#64748b' }} />
-                        <Tooltip
-                          contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: 8, color: '#fff', fontSize: 12 }}
-                        />
-                        <Bar dataKey="count" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-
-                {/* Staff Workload */}
-                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                  <div>
-                    <h2 className="text-sm font-bold text-slate-900">Staff Workload & Productivity</h2>
-                    <p className="text-xs text-slate-500">Active vs Resolved tickets per officer</p>
-                  </div>
-                  <div className="h-64 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={data.charts?.staffWorkload || []} margin={{ top: 10, right: 10, left: -20, bottom: 10 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                        <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} />
-                        <YAxis tick={{ fontSize: 11, fill: '#64748b' }} />
-                        <Tooltip
-                          contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: 8, color: '#fff', fontSize: 12 }}
-                        />
-                        <Legend wrapperStyle={{ fontSize: 12 }} />
-                        <Bar dataKey="active" name="Active Tickets" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="done" name="Resolved" fill="#10b981" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-
-                {/* Status Breakdown Pie */}
-                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                  <div>
-                    <h2 className="text-sm font-bold text-slate-900">Status Workflow Distribution</h2>
-                    <p className="text-xs text-slate-500">System-wide ticket state distribution</p>
-                  </div>
-                  <div className="h-64 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={(data.charts?.byStatus || []).filter((s: any) => s.count > 0)}
-                          dataKey="count"
-                          nameKey="status"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          label={({ name, percent }: any) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                        >
-                          {(data.charts?.byStatus || []).map((entry: any, index: number) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              </div>
-
-              {/* SLA Breaches & Overdue List */}
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="w-5 h-5 text-rose-600" />
-                    <div>
-                      <h2 className="text-base font-bold text-slate-900">SLA Breaches & Overdue Escalations</h2>
-                      <p className="text-xs text-slate-500">Tickets exceeding defined resolution deadlines</p>
+          {user.role === 'ADMIN' && data?.cards && (
+            <div className="space-y-6 animate-in fade-in duration-300">
+              {/* Executive KPI Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs card-hover">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-500">Campus Volume</span>
+                    <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                      <TicketIcon className="w-4 h-4" />
                     </div>
                   </div>
-                  <Link
-                    href="/tickets?slaStatus=OVERDUE"
-                    className="text-xs font-semibold text-rose-600 hover:text-rose-800"
-                  >
-                    View All Overdue
-                  </Link>
+                  <div className="text-3xl font-extrabold text-slate-900 font-mono mt-2 tracking-tight">
+                    {data.cards.totalTickets}
+                  </div>
+                  <span className="text-[11px] font-semibold text-slate-400 mt-1 block">All registered tickets</span>
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-100 text-slate-400 uppercase tracking-wider font-semibold">
-                        <th className="py-2.5 px-3">Ticket</th>
-                        <th className="py-2.5 px-3">Title</th>
-                        <th className="py-2.5 px-3">Category</th>
-                        <th className="py-2.5 px-3">Assignee</th>
-                        <th className="py-2.5 px-3">Status</th>
-                        <th className="py-2.5 px-3">SLA Status</th>
-                        <th className="py-2.5 px-3 text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-700">
-                      {(data.slaBreaches || []).map((t: any) => (
-                        <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="py-3 px-3 font-mono font-bold text-indigo-600">
-                            {t.ticketNumber}
-                          </td>
-                          <td className="py-3 px-3 font-medium text-slate-900 max-w-xs truncate">
-                            {t.title}
-                          </td>
-                          <td className="py-3 px-3">{t.category?.name}</td>
-                          <td className="py-3 px-3">
-                            {t.assignedStaff ? t.assignedStaff.name : <span className="text-amber-600">Unassigned</span>}
-                          </td>
-                          <td className="py-3 px-3">
-                            <StatusBadge status={t.status} size="sm" />
-                          </td>
-                          <td className="py-3 px-3">
-                            <SlaBadge metrics={t.metrics} size="sm" />
-                          </td>
-                          <td className="py-3 px-3 text-right">
-                            <Link
-                              href={`/tickets/${t.id}`}
-                              className="text-xs font-semibold text-rose-600 hover:underline"
-                            >
-                              Intervene / Escalate
-                            </Link>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs card-hover">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-500">Active Pipeline</span>
+                    <div className="w-8 h-8 rounded-xl bg-sky-50 flex items-center justify-center text-sky-600">
+                      <PlayCircle className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="text-3xl font-extrabold text-sky-600 font-mono mt-2 tracking-tight">
+                    {data.cards.activeTickets}
+                  </div>
+                  <span className="text-[11px] font-semibold text-sky-600/80 mt-1 block">Unresolved load</span>
+                </div>
+
+                <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs card-hover">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-500">SLA Compliance</span>
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+                      <ShieldCheck className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="text-3xl font-extrabold text-emerald-600 font-mono mt-2 tracking-tight">
+                    {data.cards.slaComplianceRate}%
+                  </div>
+                  <span className="text-[11px] font-semibold text-emerald-600/80 mt-1 block">Target: 90%+</span>
+                </div>
+
+                <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs card-hover">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-500">SLA Breaches</span>
+                    <div className="w-8 h-8 rounded-xl bg-rose-50 flex items-center justify-center text-rose-600">
+                      <AlertTriangle className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="text-3xl font-extrabold text-rose-600 font-mono mt-2 tracking-tight">
+                    {data.cards.breachedTickets}
+                  </div>
+                  <span className="text-[11px] font-semibold text-rose-600/80 mt-1 block">Overdue tickets</span>
                 </div>
               </div>
+
+              {/* Executive Visual Analytics Suite */}
+              {data.charts && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Department Workload Chart */}
+                  <div className="p-6 bg-white rounded-3xl border border-slate-200/80 shadow-xs">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900">Workload by Department</h3>
+                        <p className="text-xs text-slate-500 mt-0.5">Ticket load across campus faculties</p>
+                      </div>
+                      <span className="text-[10px] font-mono px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md font-bold">
+                        Distribution
+                      </span>
+                    </div>
+
+                    <div className="h-64 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={data.charts.byDepartment || []}
+                          margin={{ top: 10, right: 10, left: -20, bottom: 20 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                          <XAxis
+                            dataKey="name"
+                            tick={{ fontSize: 11, fill: '#64748b' }}
+                            interval={0}
+                            angle={-15}
+                            textAnchor="end"
+                          />
+                          <YAxis tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
+                          <Tooltip content={<CustomChartTooltip />} />
+                          <Bar dataKey="value" fill="#4f46e5" radius={[8, 8, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Priority Breakdown Donut Chart */}
+                  <div className="p-6 bg-white rounded-3xl border border-slate-200/80 shadow-xs">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900">Priority Severity Breakdown</h3>
+                        <p className="text-xs text-slate-500 mt-0.5">Urgent vs High vs Normal ticket inflow</p>
+                      </div>
+                      <span className="text-[10px] font-mono px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md font-bold">
+                        Severity
+                      </span>
+                    </div>
+
+                    <div className="h-64 w-full flex items-center justify-center">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={data.charts.byPriority || []}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={85}
+                            paddingAngle={4}
+                            dataKey="value"
+                          >
+                            {(data.charts.byPriority || []).map((entry: any, index: number) => (
+                              <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip content={<CustomChartTooltip />} />
+                          <Legend
+                            formatter={(value) => <span className="text-xs font-semibold text-slate-700">{value}</span>}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </main>
@@ -592,7 +608,8 @@ export default function DashboardPage() {
         isOpen={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
         onTicketCreated={() => {
-          loadDashboard();
+          setCreateModalOpen(false);
+          loadDashboard(true);
         }}
       />
     </div>
