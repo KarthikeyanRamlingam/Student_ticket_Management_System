@@ -1,6 +1,7 @@
 import { ApiResponse } from '../types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+const rawBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api').trim().replace(/\/+$/, '');
+const API_BASE_URL = rawBase;
 
 class ApiClient {
   private getToken(): string | null {
@@ -14,7 +15,8 @@ class ApiClient {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
-    const url = `${API_BASE_URL}${endpoint}`;
+    const formattedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const url = `${API_BASE_URL}${formattedEndpoint}`;
     const token = this.getToken();
 
     const headers: Record<string, string> = {

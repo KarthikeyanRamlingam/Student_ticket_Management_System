@@ -33,22 +33,33 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Static uploads directory
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
+// Health check endpoints
+const healthCheck = (req: express.Request, res: express.Response) => {
   return sendSuccess(res, {
     status: 'healthy',
     system: 'CampusResolve API',
     version: '1.0.0',
     timestamp: new Date().toISOString()
   });
-});
+};
+app.get('/api/health', healthCheck);
+app.get('/health', healthCheck);
 
-// Mount Routes
+// Mount Routes (supports both /api/* and /*)
 app.use('/api/auth', authRoutes);
+app.use('/auth', authRoutes);
+
 app.use('/api/tickets', ticketRoutes);
+app.use('/tickets', ticketRoutes);
+
 app.use('/api/categories', categoryRoutes);
+app.use('/categories', categoryRoutes);
+
 app.use('/api/staff', staffRoutes);
+app.use('/staff', staffRoutes);
+
 app.use('/api/analytics', analyticsRoutes);
+app.use('/analytics', analyticsRoutes);
 
 // 404 Catch-All Handler
 app.use((req, res) => {
