@@ -8,10 +8,10 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
+  destination: (_req: any, _file: any, cb: (error: Error | null, destination: string) => void) => {
     cb(null, uploadDir);
   },
-  filename: (_req, file, cb) => {
+  filename: (_req: any, file: any, cb: (error: Error | null, filename: string) => void) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
     const ext = path.extname(file.originalname);
     const basename = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -25,7 +25,7 @@ export const uploadAttachment = multer({
   limits: {
     fileSize: 5 * 1024 * 1024 // 5 MB
   },
-  fileFilter: (_req, file, cb) => {
+  fileFilter: (_req: any, file: any, cb: (error: Error | null, acceptFile?: boolean) => void) => {
     const allowedTypes = [
       'image/jpeg',
       'image/png',
