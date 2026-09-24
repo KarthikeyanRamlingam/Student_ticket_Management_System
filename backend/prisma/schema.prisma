@@ -1,0 +1,240 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  STUDENT
+  STAFF
+  ADMIN
+}
+
+enum TicketStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  WAITING_FOR_STUDENT
+  RESOLVED
+  CLOSED
+  REOPENED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum CommentVisibility {
+  PUBLIC
+  INTERNAL
+}
+
+enum ActivityType {
+  CREATED
+  ASSIGNED
+  REASSIGNED
+  STATUS_CHANGED
+  PRIORITY_CHANGED
+  COMMENT_ADDED
+  INFO_REQUESTED
+  STUDENT_REPLIED
+  ESCALATED
+  RESOLVED
+  REOPENED
+  CLOSED
+}
+
+enum EscalationLevel {
+  NONE
+  LEVEL_1
+  LEVEL_2
+}
+
+model User {
+  id              String       @id @default(uuid())
+  name            String
+  email           String       @unique
+  password        String
+  role            Role         @default(STUDENT)
+  departmentId    String?
+  department      Department?  @relation(fields: [departmentId], references: [id])
+  studentIdNumber String?
+  phoneNumber     String?
+  avatarUrl       String?
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Tickets created as student
+  ticketsCreated  Ticket[]     @relation("StudentTickets")
+  // Tickets assigned as staff
+  ticketsAssigned Ticket[]     @relation("AssignedStaffTickets")
+  // Tickets assigned by admin/staff
+  ticketsAssignedBy Ticket[]   @relation("AssignedByTickets")
+  // Tickets escalated by
+  ticketsEscalated Ticket[]    @relation("EscalatedByTickets")
+
+  // Comments authored
+  comments        TicketComment[]
+  // Activities performed
+  activities      TicketActivity[]
+  // Attachments uploaded
+  attachments     Attachment[]
+
+  @@index([email])
+  @@index([role])
+  @@index([departmentId])
+}
+
+model Department {
+  id          String     @id @default(uuid())
+  name        String     @unique
+  code        String     @unique
+  description String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  staff       User[]
+  categories  Category[]
+  tickets     Ticket[]
+
+  @@index([code])
+}
+
+model Category {
+  id              String      @id @default(uuid())
+  name            String      @unique
+  description     String?
+  departmentId    String
+  department      Department  @relation(fields: [departmentId], references: [id])
+  defaultPriority Priority    @default(MEDIUM)
+  defaultSlaHours Int         @default(48)
+  isActive        Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  tickets         Ticket[]
+
+  @@index([departmentId])
+  @@index([isActive])
+}
+
+model SlaPolicy {
+  id              String   @id @default(uuid())
+  priority        Priority @unique
+  resolutionHours Int
+  warningHours    Int
+  description     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Ticket {
+  id               String          @id @default(uuid())
+  ticketNumber     String          @unique
+  title            String
+  description      String          @db.Text
+  status           TicketStatus    @default(OPEN)
+  priority         Priority        @default(MEDIUM)
+
+  studentId        String
+  student          User            @relation("StudentTickets", fields: [studentId], references: [id])
+
+  categoryId       String
+  category         Category        @relation(fields: [categoryId], references: [id])
+
+  departmentId     String
+  department       Department      @relation(fields: [departmentId], references: [id])
+
+  assignedStaffId  String?
+  assignedStaff    User?           @relation("AssignedStaffTickets", fields: [assignedStaffId], references: [id])
+
+  assignedById     String?
+  assignedBy       User?           @relation("AssignedByTickets", fields: [assignedById], references: [id])
+
+  assignedAt       DateTime?
+
+  slaDueAt         DateTime
+  resolvedAt       DateTime?
+  closedAt         DateTime?
+  reopenedAt       DateTime?
+  reopenReason     String?         @db.Text
+  resolutionNotes  String?         @db.Text
+
+  escalationLevel  EscalationLevel @default(NONE)
+  escalatedAt      DateTime?
+  escalationReason String?         @db.Text
+  escalatedById    String?
+  escalatedBy      User?           @relation("EscalatedByTickets", fields: [escalatedById], references: [id])
+
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  comments         TicketComment[]
+  activities       TicketActivity[]
+  attachments      Attachment[]
+
+  @@index([ticketNumber])
+  @@index([status])
+  @@index([priority])
+  @@index([studentId])
+  @@index([assignedStaffId])
+  @@index([departmentId])
+  @@index([categoryId])
+  @@index([createdAt])
+  @@index([slaDueAt])
+}
+
+model TicketComment {
+  id         String            @id @default(uuid())
+  ticketId   String
+  ticket     Ticket            @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId   String
+  author     User              @relation(fields: [authorId], references: [id])
+  message    String            @db.Text
+  visibility CommentVisibility @default(PUBLIC)
+  createdAt  DateTime          @default(now())
+
+  @@index([ticketId])
+  @@index([authorId])
+  @@index([visibility])
+}
+
+model TicketActivity {
+  id        String       @id @default(uuid())
+  ticketId  String
+  ticket    Ticket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  actorId   String?
+  actor     User?        @relation(fields: [actorId], references: [id])
+  eventType ActivityType
+  oldValue  String?
+  newValue  String?
+  metadata  Json?
+  createdAt DateTime     @default(now())
+
+  @@index([ticketId])
+  @@index([actorId])
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+model Attachment {
+  id           String   @id @default(uuid())
+  ticketId     String
+  ticket       Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  fileName     String
+  fileUrl      String
+  fileSize     Int
+  mimeType     String
+  uploadedById String
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@index([ticketId])
+}
