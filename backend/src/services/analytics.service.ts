@@ -29,10 +29,14 @@ export class AnalyticsService {
     return {
       cards: {
         total,
+        totalTickets: total,
         open,
         inProgress,
+        activeTickets: open + inProgress,
         waitingForMe,
-        resolved
+        waitingForStudent: waitingForMe,
+        resolved,
+        resolvedTickets: resolved
       },
       actionRequired,
       recentTickets
@@ -67,6 +71,9 @@ export class AnalyticsService {
       }
     });
 
+    // Resolved count
+    const resolvedCount = enrichedMyTickets.filter((t) => t.status === TicketStatus.RESOLVED || t.status === TicketStatus.CLOSED).length;
+
     // Urgent queue (high priority / urgent or due soon)
     const urgentQueue = enrichedMyTickets
       .filter((t) => t.status !== TicketStatus.RESOLVED && t.status !== TicketStatus.CLOSED && (t.priority === Priority.URGENT || t.priority === Priority.HIGH || t.metrics.isDueSoon || t.metrics.isOverdue))
@@ -76,12 +83,18 @@ export class AnalyticsService {
       cards: {
         assignedToMe,
         inProgress,
+        activeTickets: assignedToMe,
         waitingForStudent,
         dueSoon,
         overdue,
-        unassignedCount
+        urgentTickets: dueSoon + overdue,
+        openInDepartment: unassignedCount,
+        unassignedCount,
+        resolvedThisWeek: resolvedCount,
+        resolvedTickets: resolvedCount
       },
       urgentQueue,
+      urgentTicketsList: urgentQueue,
       recentAssigned: enrichedMyTickets.slice(0, 8)
     };
   }
@@ -138,7 +151,23 @@ export class AnalyticsService {
       const cat = t.category.name;
       categoryMap[cat] = (categoryMap[cat] || 0) + 1;
     });
-    const byCategory = Object.entries(categoryMap).map(([name, count]) => ({ name, count }));
+    const byCategory = Object.entries(categoryMap).map(([name, count]) => ({
+      name,
+      value: count,
+      count
+    }));
+
+    // Charts: Tickets by Department
+    const deptMap: Record<string, number> = {};
+    enriched.forEach((t) => {
+      const dName = t.department?.name || 'General';
+      deptMap[dName] = (deptMap[dName] || 0) + 1;
+    });
+    const byDepartment = Object.entries(deptMap).map(([name, count]) => ({
+      name,
+      value: count,
+      count
+    }));
 
     // Charts: Tickets by Status
     const statusMap: Record<string, number> = {};
@@ -146,7 +175,12 @@ export class AnalyticsService {
     enriched.forEach((t) => {
       statusMap[t.status] = (statusMap[t.status] || 0) + 1;
     });
-    const byStatus = Object.entries(statusMap).map(([status, count]) => ({ status, count }));
+    const byStatus = Object.entries(statusMap).map(([status, count]) => ({
+      name: status,
+      status,
+      value: count,
+      count
+    }));
 
     // Charts: Tickets by Priority
     const priorityMap: Record<string, number> = {};
@@ -154,7 +188,12 @@ export class AnalyticsService {
     enriched.forEach((t) => {
       priorityMap[t.priority] = (priorityMap[t.priority] || 0) + 1;
     });
-    const byPriority = Object.entries(priorityMap).map(([priority, count]) => ({ priority, count }));
+    const byPriority = Object.entries(priorityMap).map(([priority, count]) => ({
+      name: priority,
+      priority,
+      value: count,
+      count
+    }));
 
     // Charts: Ageing Distribution for open tickets
     const ageingMap: Record<string, number> = {
@@ -169,7 +208,12 @@ export class AnalyticsService {
       else if (t.metrics.ageingBucket === '4_7_DAYS') ageingMap['4–7 Days']++;
       else ageingMap['8+ Days']++;
     });
-    const ageingDistribution = Object.entries(ageingMap).map(([bucket, count]) => ({ bucket, count }));
+    const ageingDistribution = Object.entries(ageingMap).map(([bucket, count]) => ({
+      name: bucket,
+      bucket,
+      value: count,
+      count
+    }));
 
     // Charts: Staff Workload
     const staffList = await prisma.user.findMany({
@@ -189,7 +233,8 @@ export class AnalyticsService {
         active,
         done,
         overdue,
-        total: staffTickets.length
+        total: staffTickets.length,
+        value: staffTickets.length
       };
     });
 
@@ -198,7 +243,7 @@ export class AnalyticsService {
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
       .slice(0, 5);
 
-    // SLA Breaches
+    // SLA Breaches / Urgent tickets list
     const slaBreaches = enriched
       .filter((t) => t.metrics.slaStatus === 'OVERDUE' || t.metrics.slaStatus === 'BREACHED')
       .slice(0, 6);
@@ -206,22 +251,29 @@ export class AnalyticsService {
     return {
       cards: {
         total,
+        totalTickets: total,
         open: openCount,
+        activeTickets: openCount,
         resolved: resolvedCount,
+        resolvedTickets: resolvedCount,
         overdue: overdueCount,
+        breachedTickets: overdueCount,
         unassigned: unassignedCount,
+        unassignedTickets: unassignedCount,
         slaComplianceRate,
         avgResolutionHours
       },
       charts: {
         byCategory,
+        byDepartment,
         byStatus,
         byPriority,
         ageingDistribution,
         staffWorkload
       },
       oldestUnresolved,
-      slaBreaches
+      slaBreaches,
+      urgentTicketsList: slaBreaches
     };
   }
 }

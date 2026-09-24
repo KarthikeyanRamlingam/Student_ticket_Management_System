@@ -55,7 +55,6 @@ export default function DashboardPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [timeRange, setTimeRange] = useState<'7d' | '30d' | 'all'>('7d');
 
   const loadDashboard = useCallback(async (isRefresh = false) => {
     if (!user) return;
@@ -100,7 +99,39 @@ export default function DashboardPage() {
     );
   }
 
-  const CHART_COLORS = ['#4f46e5', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#f43f5e'];
+  const CHART_COLORS = ['#4f46e5', '#0284c7', '#059669', '#d97706', '#db2777', '#7c3aed', '#0891b2', '#e11d48'];
+
+  // Normalized counts for each role
+  const studentTotal = data?.cards?.totalTickets ?? data?.cards?.total ?? 0;
+  const studentActive = data?.cards?.activeTickets ?? ((data?.cards?.open ?? 0) + (data?.cards?.inProgress ?? 0));
+  const studentWaiting = data?.cards?.waitingForStudent ?? data?.cards?.waitingForMe ?? 0;
+  const studentResolved = data?.cards?.resolvedTickets ?? data?.cards?.resolved ?? 0;
+
+  const staffAssigned = data?.cards?.assignedToMe ?? 0;
+  const staffDept = data?.cards?.openInDepartment ?? data?.cards?.unassignedCount ?? data?.cards?.unassigned ?? 0;
+  const staffUrgent = data?.cards?.urgentTickets ?? ((data?.cards?.dueSoon ?? 0) + (data?.cards?.overdue ?? 0));
+  const staffResolved = data?.cards?.resolvedThisWeek ?? data?.cards?.resolvedTickets ?? data?.cards?.resolved ?? 0;
+
+  const adminTotal = data?.cards?.totalTickets ?? data?.cards?.total ?? 0;
+  const adminActive = data?.cards?.activeTickets ?? data?.cards?.open ?? 0;
+  const adminSla = data?.cards?.slaComplianceRate ?? 100;
+  const adminBreaches = data?.cards?.breachedTickets ?? data?.cards?.overdue ?? 0;
+
+  // Normalized chart arrays
+  const departmentData = (data?.charts?.byDepartment || data?.charts?.byCategory || []).map((d: any) => ({
+    name: d.name || 'General',
+    value: Number(d.value ?? d.count ?? 0)
+  }));
+
+  const priorityData = (data?.charts?.byPriority || []).map((d: any) => ({
+    name: d.name || d.priority || 'Medium',
+    value: Number(d.value ?? d.count ?? 0)
+  }));
+
+  const categoryData = (data?.charts?.byCategory || []).map((d: any) => ({
+    name: d.name || 'General',
+    value: Number(d.value ?? d.count ?? 0)
+  }));
 
   const CustomChartTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -109,7 +140,7 @@ export default function DashboardPage() {
           <p className="font-bold text-slate-200 mb-1">{label || payload[0].name}</p>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: payload[0].color || '#6366f1' }} />
-            <span className="text-slate-400">Count:</span>
+            <span className="text-slate-400">Total:</span>
             <span className="font-mono font-bold text-white">{payload[0].value} tickets</span>
           </div>
         </div>
@@ -254,7 +285,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="text-3xl font-extrabold text-slate-900 font-mono mt-2 tracking-tight">
-                    {data.cards.totalTickets}
+                    {studentTotal}
                   </div>
                   <span className="text-[11px] font-medium text-slate-400 mt-1 block">Lifetime tickets</span>
                 </div>
@@ -267,7 +298,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="text-3xl font-extrabold text-indigo-600 font-mono mt-2 tracking-tight">
-                    {data.cards.activeTickets}
+                    {studentActive}
                   </div>
                   <span className="text-[11px] font-semibold text-indigo-600/80 mt-1 block">Being worked on</span>
                 </div>
@@ -280,7 +311,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="text-3xl font-extrabold text-amber-600 font-mono mt-2 tracking-tight">
-                    {data.cards.waitingForStudent}
+                    {studentWaiting}
                   </div>
                   <span className="text-[11px] font-semibold text-amber-600/80 mt-1 block">Requires your reply</span>
                 </div>
@@ -293,7 +324,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="text-3xl font-extrabold text-emerald-600 font-mono mt-2 tracking-tight">
-                    {data.cards.resolvedTickets}
+                    {studentResolved}
                   </div>
                   <span className="text-[11px] font-semibold text-emerald-600/80 mt-1 block">Successfully closed</span>
                 </div>
@@ -369,7 +400,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="text-3xl font-extrabold text-indigo-600 font-mono mt-2 tracking-tight">
-                    {data.cards.assignedToMe}
+                    {staffAssigned}
                   </div>
                   <span className="text-[11px] font-semibold text-slate-400 mt-1 block">Active desk queue</span>
                 </div>
@@ -382,7 +413,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="text-3xl font-extrabold text-slate-900 font-mono mt-2 tracking-tight">
-                    {data.cards.openInDepartment}
+                    {staffDept}
                   </div>
                   <span className="text-[11px] font-semibold text-sky-600/80 mt-1 block">Available to claim</span>
                 </div>
@@ -395,22 +426,22 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="text-3xl font-extrabold text-rose-600 font-mono mt-2 tracking-tight">
-                    {data.cards.urgentTickets}
+                    {staffUrgent}
                   </div>
                   <span className="text-[11px] font-semibold text-rose-600/80 mt-1 block">SLA risk / urgent</span>
                 </div>
 
                 <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs card-hover">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-500">Resolved (7 Days)</span>
+                    <span className="text-xs font-semibold text-slate-500">Resolved (Total)</span>
                     <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
                       <CheckCircle2 className="w-4 h-4" />
                     </div>
                   </div>
                   <div className="text-3xl font-extrabold text-emerald-600 font-mono mt-2 tracking-tight">
-                    {data.cards.resolvedThisWeek}
+                    {staffResolved}
                   </div>
-                  <span className="text-[11px] font-semibold text-emerald-600/80 mt-1 block">Weekly velocity</span>
+                  <span className="text-[11px] font-semibold text-emerald-600/80 mt-1 block">Total resolved</span>
                 </div>
               </div>
 
@@ -479,7 +510,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="text-3xl font-extrabold text-slate-900 font-mono mt-2 tracking-tight">
-                    {data.cards.totalTickets}
+                    {adminTotal}
                   </div>
                   <span className="text-[11px] font-semibold text-slate-400 mt-1 block">All registered tickets</span>
                 </div>
@@ -492,7 +523,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="text-3xl font-extrabold text-sky-600 font-mono mt-2 tracking-tight">
-                    {data.cards.activeTickets}
+                    {adminActive}
                   </div>
                   <span className="text-[11px] font-semibold text-sky-600/80 mt-1 block">Unresolved load</span>
                 </div>
@@ -505,7 +536,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="text-3xl font-extrabold text-emerald-600 font-mono mt-2 tracking-tight">
-                    {data.cards.slaComplianceRate}%
+                    {adminSla}%
                   </div>
                   <span className="text-[11px] font-semibold text-emerald-600/80 mt-1 block">Target: 90%+</span>
                 </div>
@@ -518,32 +549,32 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="text-3xl font-extrabold text-rose-600 font-mono mt-2 tracking-tight">
-                    {data.cards.breachedTickets}
+                    {adminBreaches}
                   </div>
                   <span className="text-[11px] font-semibold text-rose-600/80 mt-1 block">Overdue tickets</span>
                 </div>
               </div>
 
               {/* Executive Visual Analytics Suite */}
-              {data.charts && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Department Workload Chart */}
-                  <div className="p-6 bg-white rounded-3xl border border-slate-200/80 shadow-xs">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="text-sm font-bold text-slate-900">Workload by Department</h3>
-                        <p className="text-xs text-slate-500 mt-0.5">Ticket load across campus faculties</p>
-                      </div>
-                      <span className="text-[10px] font-mono px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md font-bold">
-                        Distribution
-                      </span>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Department Workload Chart */}
+                <div className="p-6 bg-white rounded-3xl border border-slate-200/80 shadow-xs">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">Workload by Department</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">Ticket load across campus faculties</p>
                     </div>
+                    <span className="text-[10px] font-mono px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md font-bold">
+                      Distribution
+                    </span>
+                  </div>
 
-                    <div className="h-64 w-full">
-                      <ResponsiveContainer width="100%" height="100%">
+                  <div className="w-full h-[260px] min-h-[260px]">
+                    {departmentData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={260}>
                         <BarChart
-                          data={data.charts.byDepartment || []}
-                          margin={{ top: 10, right: 10, left: -20, bottom: 20 }}
+                          data={departmentData}
+                          margin={{ top: 10, right: 10, left: -20, bottom: 25 }}
                         >
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                           <XAxis
@@ -558,26 +589,32 @@ export default function DashboardPage() {
                           <Bar dataKey="value" fill="#4f46e5" radius={[8, 8, 0, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-xs text-slate-400">
+                        No department distribution data available
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Priority Breakdown Donut Chart */}
+                <div className="p-6 bg-white rounded-3xl border border-slate-200/80 shadow-xs">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">Priority Severity Breakdown</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">Urgent vs High vs Normal ticket inflow</p>
                     </div>
+                    <span className="text-[10px] font-mono px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md font-bold">
+                      Severity
+                    </span>
                   </div>
 
-                  {/* Priority Breakdown Donut Chart */}
-                  <div className="p-6 bg-white rounded-3xl border border-slate-200/80 shadow-xs">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="text-sm font-bold text-slate-900">Priority Severity Breakdown</h3>
-                        <p className="text-xs text-slate-500 mt-0.5">Urgent vs High vs Normal ticket inflow</p>
-                      </div>
-                      <span className="text-[10px] font-mono px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md font-bold">
-                        Severity
-                      </span>
-                    </div>
-
-                    <div className="h-64 w-full flex items-center justify-center">
-                      <ResponsiveContainer width="100%" height="100%">
+                  <div className="w-full h-[260px] min-h-[260px] flex items-center justify-center">
+                    {priorityData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={260}>
                         <PieChart>
                           <Pie
-                            data={data.charts.byPriority || []}
+                            data={priorityData}
                             cx="50%"
                             cy="50%"
                             innerRadius={60}
@@ -585,7 +622,7 @@ export default function DashboardPage() {
                             paddingAngle={4}
                             dataKey="value"
                           >
-                            {(data.charts.byPriority || []).map((entry: any, index: number) => (
+                            {priorityData.map((entry: any, index: number) => (
                               <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                             ))}
                           </Pie>
@@ -595,7 +632,47 @@ export default function DashboardPage() {
                           />
                         </PieChart>
                       </ResponsiveContainer>
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-xs text-slate-400">
+                        No priority distribution data available
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Tickets by Category Grid Chart */}
+              {categoryData.length > 0 && (
+                <div className="p-6 bg-white rounded-3xl border border-slate-200/80 shadow-xs">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">Distribution by Category</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">Volume across administrative categories</p>
                     </div>
+                    <span className="text-[10px] font-mono px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md font-bold">
+                      Category Breakdown
+                    </span>
+                  </div>
+
+                  <div className="w-full h-[260px] min-h-[260px]">
+                    <ResponsiveContainer width="100%" height={260}>
+                      <BarChart
+                        data={categoryData}
+                        margin={{ top: 10, right: 10, left: -20, bottom: 35 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis
+                          dataKey="name"
+                          tick={{ fontSize: 10, fill: '#64748b' }}
+                          interval={0}
+                          angle={-20}
+                          textAnchor="end"
+                        />
+                        <YAxis tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
+                        <Tooltip content={<CustomChartTooltip />} />
+                        <Bar dataKey="value" fill="#0284c7" radius={[6, 6, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
                   </div>
                 </div>
               )}
