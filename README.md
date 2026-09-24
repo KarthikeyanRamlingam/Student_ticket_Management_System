@@ -2,6 +2,10 @@
 
 An enterprise-grade, full-stack institutional ticket management and SLA resolution platform engineered for universities, colleges, and higher-education institutions.
 
+- **GitHub Repository**: [https://github.com/KarthikeyanRamlingam/Student_ticket_Management_System.git](https://github.com/KarthikeyanRamlingam/Student_ticket_Management_System.git)
+- **Live Local Prototype**: `http://localhost:3000` (Frontend) & `http://localhost:4000` (Backend API)
+- **Database Engine**: PostgreSQL 18 on port 5433 (Data persisted in `backend/pgdata`)
+
 CampusResolve streamlines and modernizes campus administrative requests (Fees, Attendance, ID Cards, Certificates, Examinations, Scholarships, Hostel, Transport, and Technical Support) through transparent ownership, role-based workflows, strict SLA tracking, and complete audit accountability.
 
 ---
