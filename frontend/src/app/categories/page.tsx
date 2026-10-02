@@ -135,7 +135,7 @@ export default function CategoriesPage() {
       <div className="flex flex-1">
         <Sidebar />
 
-        <main className="flex-1 p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-5 sm:space-y-6 min-w-0">
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <div>

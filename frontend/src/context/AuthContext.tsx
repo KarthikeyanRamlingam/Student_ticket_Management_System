@@ -29,19 +29,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         setToken(savedToken);
         setUser(JSON.parse(savedUser));
-        // Refresh me from backend to ensure active session
+        // Render immediately from the cached identity, then validate it in the
+        // background. Protected API calls still enforce the server-side token.
+        setLoading(false);
         api.get<User>('/auth/me')
           .then((res) => {
             setUser(res.data);
             localStorage.setItem('cr_user', JSON.stringify(res.data));
           })
           .catch(() => {
-            // Token expired or invalid
-            logout();
-          })
-          .finally(() => setLoading(false));
-      } catch (e) {
-        logout();
+            setUser(null);
+            setToken(null);
+            localStorage.removeItem('cr_token');
+            localStorage.removeItem('cr_user');
+          });
+      } catch {
+        setUser(null);
+        setToken(null);
+        localStorage.removeItem('cr_token');
+        localStorage.removeItem('cr_user');
         setLoading(false);
       }
     } else {

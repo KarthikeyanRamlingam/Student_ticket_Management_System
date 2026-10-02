@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 import { Category, Priority, Ticket } from '../types';
-import { X, Upload, AlertCircle, Loader2 } from 'lucide-react';
+import { X, Upload, AlertCircle, Loader2, CheckCircle2, FileText } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
 interface Props {
@@ -11,6 +11,8 @@ interface Props {
   onClose: () => void;
   onTicketCreated: (newTicket: Ticket) => void;
 }
+
+let categoryCache: Category[] | null = null;
 
 export function CreateTicketModal({ isOpen, onClose, onTicketCreated }: Props) {
   const { success } = useToast();
@@ -27,10 +29,19 @@ export function CreateTicketModal({ isOpen, onClose, onTicketCreated }: Props) {
 
   useEffect(() => {
     if (isOpen) {
+      if (categoryCache) {
+        setCategories(categoryCache);
+        if (!categoryId && categoryCache[0]) {
+          setCategoryId(categoryCache[0].id);
+          setPriority(categoryCache[0].defaultPriority || 'MEDIUM');
+        }
+        return;
+      }
       setLoadingCategories(true);
       setError(null);
       api.get<Category[]>('/categories')
         .then((res) => {
+          categoryCache = res.data;
           setCategories(res.data);
           if (res.data.length > 0) {
             setCategoryId(res.data[0].id);
@@ -43,6 +54,18 @@ export function CreateTicketModal({ isOpen, onClose, onTicketCreated }: Props) {
         .finally(() => setLoadingCategories(false));
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => event.key === 'Escape' && !submitting && onClose();
+    document.addEventListener('keydown', closeOnEscape);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', closeOnEscape);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen, onClose, submitting]);
 
   const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedId = e.target.value;
@@ -101,13 +124,14 @@ export function CreateTicketModal({ isOpen, onClose, onTicketCreated }: Props) {
   const selectedCategory = categories.find((c) => c.id === categoryId);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white text-slate-900 rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in" onMouseDown={(event) => event.target === event.currentTarget && !submitting && onClose()}>
+      <div role="dialog" aria-modal="true" aria-labelledby="create-ticket-title" className="bg-white text-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[94vh] overflow-y-auto">
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">Submit Support Ticket</h2>
-            <p className="text-xs text-slate-600">Provide complete information so our staff can resolve your request promptly.</p>
+            <div className="mb-1 flex items-center gap-2 text-xs font-bold text-indigo-600"><FileText className="h-4 w-4" /> New support request</div>
+            <h2 id="create-ticket-title" className="text-lg font-bold text-slate-900">Tell us what you need help with</h2>
+            <p className="text-xs text-slate-600">A clear summary helps the right campus team respond faster.</p>
           </div>
           <button
             onClick={onClose}
@@ -120,7 +144,7 @@ export function CreateTicketModal({ isOpen, onClose, onTicketCreated }: Props) {
         {/* Modal Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {error && (
-            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+            <div role="alert" className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
               <span>{error}</span>
             </div>
@@ -129,7 +153,7 @@ export function CreateTicketModal({ isOpen, onClose, onTicketCreated }: Props) {
           {/* Ticket Title */}
           <div>
             <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
-              Ticket Subject / Title *
+              Short summary *
             </label>
             <input
               type="text"
@@ -205,7 +229,7 @@ export function CreateTicketModal({ isOpen, onClose, onTicketCreated }: Props) {
               placeholder="Describe your issue with relevant transaction IDs, dates, course codes, or room numbers..."
               className="w-full px-3.5 py-2.5 text-sm font-medium text-slate-900 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 placeholder:text-slate-400 transition-all shadow-sm"
             />
-            <p className="mt-1 text-[11px] text-slate-500">Minimum 15 characters.</p>
+            <div className="mt-1 flex justify-between gap-3 text-[11px] text-slate-500"><span>Include dates, IDs, course codes, or room numbers when relevant.</span><span className="shrink-0">{description.length} characters</span></div>
           </div>
 
           {/* Optional Attachment */}
@@ -223,7 +247,13 @@ export function CreateTicketModal({ isOpen, onClose, onTicketCreated }: Props) {
                   className="hidden"
                   onChange={(e) => {
                     if (e.target.files && e.target.files[0]) {
-                      setFile(e.target.files[0]);
+                      const nextFile = e.target.files[0];
+                      if (nextFile.size > 5 * 1024 * 1024) {
+                        setError('That file is larger than 5 MB. Please choose a smaller attachment.');
+                        return;
+                      }
+                      setError(null);
+                      setFile(nextFile);
                     }
                   }}
                 />
@@ -261,7 +291,8 @@ export function CreateTicketModal({ isOpen, onClose, onTicketCreated }: Props) {
               className="px-5 py-2.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-xl shadow-md shadow-indigo-600/20 flex items-center gap-2 transition-all"
             >
               {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              <span>{submitting ? 'Submitting...' : 'Submit Ticket'}</span>
+              {!submitting && <CheckCircle2 className="h-4 w-4" />}
+              <span>{submitting ? 'Sending request...' : 'Send support request'}</span>
             </button>
           </div>
         </form>

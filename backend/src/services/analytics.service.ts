@@ -5,26 +5,50 @@ import { JwtPayload } from '../types';
 
 export class AnalyticsService {
   async getStudentAnalytics(user: JwtPayload) {
-    const tickets = await prisma.ticket.findMany({
-      where: { studentId: user.userId },
-      include: {
-        category: { select: { name: true } },
-        department: { select: { name: true, code: true } },
-        assignedStaff: { select: { name: true } }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+    const summarySelect = {
+      id: true,
+      ticketNumber: true,
+      title: true,
+      status: true,
+      priority: true,
+      createdAt: true,
+      updatedAt: true,
+      slaDueAt: true,
+      resolvedAt: true,
+      category: { select: { name: true } },
+      department: { select: { name: true, code: true } },
+      assignedStaff: { select: { name: true } }
+    } as const;
 
-    const enriched = tickets.map((t) => ({ ...t, metrics: computeTicketMetrics(t) }));
+    const [statusGroups, actionRows, recentRows] = await Promise.all([
+      prisma.ticket.groupBy({
+        by: ['status'],
+        where: { studentId: user.userId },
+        _count: { _all: true }
+      }),
+      prisma.ticket.findMany({
+        where: { studentId: user.userId, status: TicketStatus.WAITING_FOR_STUDENT },
+        select: summarySelect,
+        orderBy: { updatedAt: 'desc' },
+        take: 5
+      }),
+      prisma.ticket.findMany({
+        where: { studentId: user.userId },
+        select: summarySelect,
+        orderBy: { createdAt: 'desc' },
+        take: 5
+      })
+    ]);
 
-    const total = enriched.length;
-    const open = enriched.filter((t) => t.status === TicketStatus.OPEN).length;
-    const inProgress = enriched.filter((t) => t.status === TicketStatus.IN_PROGRESS || t.status === TicketStatus.ASSIGNED || t.status === TicketStatus.REOPENED).length;
-    const waitingForMe = enriched.filter((t) => t.status === TicketStatus.WAITING_FOR_STUDENT).length;
-    const resolved = enriched.filter((t) => t.status === TicketStatus.RESOLVED || t.status === TicketStatus.CLOSED).length;
-
-    const actionRequired = enriched.filter((t) => t.status === TicketStatus.WAITING_FOR_STUDENT);
-    const recentTickets = enriched.slice(0, 5);
+    const counts = new Map(statusGroups.map((row) => [row.status, row._count._all]));
+    const count = (status: TicketStatus) => counts.get(status) || 0;
+    const total = statusGroups.reduce((sum, row) => sum + row._count._all, 0);
+    const open = count(TicketStatus.OPEN);
+    const inProgress = count(TicketStatus.IN_PROGRESS) + count(TicketStatus.ASSIGNED) + count(TicketStatus.REOPENED);
+    const waitingForMe = count(TicketStatus.WAITING_FOR_STUDENT);
+    const resolved = count(TicketStatus.RESOLVED) + count(TicketStatus.CLOSED);
+    const actionRequired = actionRows.map((ticket) => ({ ...ticket, metrics: computeTicketMetrics(ticket) }));
+    const recentTickets = recentRows.map((ticket) => ({ ...ticket, metrics: computeTicketMetrics(ticket) }));
 
     return {
       cards: {
@@ -44,40 +68,59 @@ export class AnalyticsService {
   }
 
   async getStaffAnalytics(user: JwtPayload) {
-    // Staff's assigned tickets + unassigned department tickets
-    const myTickets = await prisma.ticket.findMany({
-      where: { assignedStaffId: user.userId },
-      include: {
-        category: { select: { name: true } },
-        department: { select: { name: true, code: true } },
-        student: { select: { name: true, studentIdNumber: true } }
-      },
-      orderBy: { slaDueAt: 'asc' }
-    });
+    const activeStatuses = [TicketStatus.OPEN, TicketStatus.ASSIGNED, TicketStatus.IN_PROGRESS, TicketStatus.WAITING_FOR_STUDENT, TicketStatus.REOPENED];
+    const ticketSelect = {
+      id: true,
+      ticketNumber: true,
+      title: true,
+      status: true,
+      priority: true,
+      createdAt: true,
+      updatedAt: true,
+      slaDueAt: true,
+      resolvedAt: true,
+      category: { select: { name: true } },
+      department: { select: { name: true, code: true } },
+      student: { select: { name: true, studentIdNumber: true } }
+    } as const;
+    const assignedWhere = { assignedStaffId: user.userId };
+    const now = new Date();
+    const departmentScope = user.departmentId ? { departmentId: user.departmentId } : {};
 
-    const enrichedMyTickets = myTickets.map((t) => ({ ...t, metrics: computeTicketMetrics(t) }));
+    const [statusGroups, dueSoon, overdue, unassignedCount, urgentRows, recentRows] = await Promise.all([
+      prisma.ticket.groupBy({ by: ['status'], where: assignedWhere, _count: { _all: true } }),
+      prisma.ticket.count({
+        where: {
+          ...assignedWhere,
+          status: { in: activeStatuses },
+          slaDueAt: { gte: now },
+          OR: [
+            { priority: Priority.URGENT, slaDueAt: { lte: new Date(now.getTime() + 2 * 60 * 60 * 1000) } },
+            { priority: Priority.HIGH, slaDueAt: { lte: new Date(now.getTime() + 6 * 60 * 60 * 1000) } },
+            { priority: Priority.MEDIUM, slaDueAt: { lte: new Date(now.getTime() + 12 * 60 * 60 * 1000) } },
+            { priority: Priority.LOW, slaDueAt: { lte: new Date(now.getTime() + 18 * 60 * 60 * 1000) } }
+          ]
+        }
+      }),
+      prisma.ticket.count({ where: { ...assignedWhere, status: { in: activeStatuses }, slaDueAt: { lt: now } } }),
+      prisma.ticket.count({ where: { ...departmentScope, assignedStaffId: null, status: { in: [TicketStatus.OPEN, TicketStatus.REOPENED] } } }),
+      prisma.ticket.findMany({
+        where: { ...assignedWhere, status: { in: activeStatuses }, OR: [{ priority: { in: [Priority.URGENT, Priority.HIGH] } }, { slaDueAt: { lt: new Date(now.getTime() + 18 * 60 * 60 * 1000) } }] },
+        select: ticketSelect,
+        orderBy: [{ slaDueAt: 'asc' }, { priority: 'desc' }],
+        take: 6
+      }),
+      prisma.ticket.findMany({ where: assignedWhere, select: ticketSelect, orderBy: { updatedAt: 'desc' }, take: 8 })
+    ]);
 
-    const assignedToMe = enrichedMyTickets.filter((t) => t.status !== TicketStatus.RESOLVED && t.status !== TicketStatus.CLOSED).length;
-    const inProgress = enrichedMyTickets.filter((t) => t.status === TicketStatus.IN_PROGRESS).length;
-    const waitingForStudent = enrichedMyTickets.filter((t) => t.status === TicketStatus.WAITING_FOR_STUDENT).length;
-    const dueSoon = enrichedMyTickets.filter((t) => t.metrics.isDueSoon && t.status !== TicketStatus.RESOLVED && t.status !== TicketStatus.CLOSED).length;
-    const overdue = enrichedMyTickets.filter((t) => t.metrics.isOverdue && t.status !== TicketStatus.RESOLVED && t.status !== TicketStatus.CLOSED).length;
-
-    // Unassigned tickets in queue
-    const unassignedCount = await prisma.ticket.count({
-      where: {
-        assignedStaffId: null,
-        status: { in: [TicketStatus.OPEN, TicketStatus.REOPENED] }
-      }
-    });
-
-    // Resolved count
-    const resolvedCount = enrichedMyTickets.filter((t) => t.status === TicketStatus.RESOLVED || t.status === TicketStatus.CLOSED).length;
-
-    // Urgent queue (high priority / urgent or due soon)
-    const urgentQueue = enrichedMyTickets
-      .filter((t) => t.status !== TicketStatus.RESOLVED && t.status !== TicketStatus.CLOSED && (t.priority === Priority.URGENT || t.priority === Priority.HIGH || t.metrics.isDueSoon || t.metrics.isOverdue))
-      .slice(0, 6);
+    const counts = new Map(statusGroups.map((row) => [row.status, row._count._all]));
+    const count = (status: TicketStatus) => counts.get(status) || 0;
+    const assignedToMe = activeStatuses.reduce((sum, status) => sum + count(status), 0);
+    const inProgress = count(TicketStatus.IN_PROGRESS);
+    const waitingForStudent = count(TicketStatus.WAITING_FOR_STUDENT);
+    const resolvedCount = count(TicketStatus.RESOLVED) + count(TicketStatus.CLOSED);
+    const urgentQueue = urgentRows.map((ticket) => ({ ...ticket, metrics: computeTicketMetrics(ticket) }));
+    const recentAssigned = recentRows.map((ticket) => ({ ...ticket, metrics: computeTicketMetrics(ticket) }));
 
     return {
       cards: {
@@ -95,13 +138,25 @@ export class AnalyticsService {
       },
       urgentQueue,
       urgentTicketsList: urgentQueue,
-      recentAssigned: enrichedMyTickets.slice(0, 8)
+      recentAssigned
     };
   }
 
   async getAdminAnalytics() {
+    // Analytics needs a narrow projection; avoid transferring large ticket
+    // descriptions and resolution notes from Postgres on every dashboard load.
     const allTickets = await prisma.ticket.findMany({
-      include: {
+      select: {
+        id: true,
+        ticketNumber: true,
+        title: true,
+        status: true,
+        priority: true,
+        createdAt: true,
+        updatedAt: true,
+        slaDueAt: true,
+        resolvedAt: true,
+        assignedStaffId: true,
         category: { select: { id: true, name: true } },
         department: { select: { id: true, name: true, code: true } },
         student: { select: { id: true, name: true } },

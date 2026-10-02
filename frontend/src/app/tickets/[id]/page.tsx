@@ -343,7 +343,7 @@ export default function TicketDetailsPage({ params }: { params: Promise<{ id: st
       <div className="flex flex-1">
         <Sidebar />
 
-        <main className="flex-1 p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-5 sm:space-y-6 min-w-0">
           {/* Top Navigation & Breadcrumbs */}
           <div className="flex items-center justify-between">
             <Link

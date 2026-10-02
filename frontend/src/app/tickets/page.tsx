@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
@@ -12,7 +12,6 @@ import { TicketKanbanBoard } from '../../components/TicketKanbanBoard';
 import { CreateTicketModal } from '../../components/CreateTicketModal';
 import {
   Search,
-  RotateCcw,
   PlusCircle,
   Loader2,
   LayoutGrid,
@@ -22,7 +21,6 @@ import {
   UserCheck,
   Inbox,
   ClockAlert,
-  Sparkles,
   X
 } from 'lucide-react';
 
@@ -38,9 +36,11 @@ function TicketsContent() {
 
   // View Mode: table vs kanban
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
+  const [filterOpen, setFilterOpen] = useState(false);
 
   // Filters state
   const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') || '');
   const [status, setStatus] = useState<string>(searchParams.get('status') || '');
   const [priority, setPriority] = useState<string>(searchParams.get('priority') || '');
   const [categoryId, setCategoryId] = useState<string>(searchParams.get('categoryId') || '');
@@ -55,6 +55,19 @@ function TicketsContent() {
   const [totalCount, setTotalCount] = useState(0);
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const latestRequest = useRef(0);
+
+  useEffect(() => {
+    if (user?.role === 'STUDENT' && searchParams.get('create') === '1') {
+      queueMicrotask(() => setCreateModalOpen(true));
+    }
+  }, [searchParams, user?.role]);
+
+  // Avoid a network/database round trip for every keystroke.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 350);
+    return () => window.clearTimeout(timer);
+  }, [search]);
 
   // Load Categories for filter dropdown
   useEffect(() => {
@@ -67,11 +80,12 @@ function TicketsContent() {
 
   const loadTickets = useCallback(async () => {
     if (!user) return;
+    const requestId = ++latestRequest.current;
     setLoading(true);
     setError(null);
     try {
       const res = await api.get<Ticket[]>('/tickets', {
-        search: search.trim() || undefined,
+        search: debouncedSearch || undefined,
         status: status || undefined,
         priority: priority || undefined,
         categoryId: categoryId || undefined,
@@ -83,26 +97,26 @@ function TicketsContent() {
         limit: viewMode === 'kanban' ? 50 : 10
       });
 
+      if (requestId !== latestRequest.current) return;
       setTickets(res.data);
       if (res.meta) {
         setTotalPages(res.meta.totalPages || 1);
         setTotalCount(res.meta.total || 0);
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch tickets.');
+    } catch (err: unknown) {
+      if (requestId !== latestRequest.current) return;
+      setError(err instanceof Error ? err.message : 'Failed to fetch tickets.');
     } finally {
-      setLoading(false);
+      if (requestId === latestRequest.current) setLoading(false);
     }
-  }, [user, search, status, priority, categoryId, slaStatus, assignedStaffId, sortBy, sortOrder, page, viewMode]);
+  }, [user, debouncedSearch, status, priority, categoryId, slaStatus, assignedStaffId, sortBy, sortOrder, page, viewMode]);
 
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login');
       return;
     }
-    if (user) {
-      loadTickets();
-    }
+    if (user) queueMicrotask(() => loadTickets());
   }, [user, authLoading, router, loadTickets]);
 
   const handleResetFilters = () => {
@@ -130,22 +144,22 @@ function TicketsContent() {
   }
 
   return (
-    <main className="flex-1 p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
+    <main className="flex-1 px-4 py-6 sm:px-7 lg:px-10 lg:py-9 max-w-7xl mx-auto w-full space-y-5 sm:space-y-6 min-w-0">
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">
-              {user.role === 'STUDENT' ? 'My Support Requests' : 'Central Ticket Management Center'}
+            <h1 className="text-3xl font-extrabold text-slate-950 tracking-tight">
+              {user.role === 'STUDENT' ? 'My requests' : 'Support queue'}
             </h1>
             <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
               {totalCount} Total
             </span>
           </div>
-          <p className="text-xs text-slate-500 font-medium mt-1">
+          <p className="text-sm text-slate-500 mt-2">
             {user.role === 'STUDENT'
-              ? 'Real-time visibility into your administrative inquiries, SLA timers, and staff communication.'
-              : 'Triage, claim, re-assign, and resolve student support cases under institutional SLA guidelines.'}
+              ? 'See progress, read replies, and keep every campus conversation in one place.'
+              : 'Find what needs attention, help students, and keep requests moving.'}
           </p>
         </div>
 
@@ -162,7 +176,7 @@ function TicketsContent() {
               title="Table View"
             >
               <List className="w-4 h-4" />
-              <span>Grid</span>
+              <span>List</span>
             </button>
             <button
               onClick={() => setViewMode('kanban')}
@@ -184,7 +198,7 @@ function TicketsContent() {
               className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs flex items-center gap-2 shadow-md shadow-indigo-600/20 hover:shadow-indigo-600/35 transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
               <PlusCircle className="w-4 h-4" />
-              <span>+ New Ticket</span>
+              <span>New request</span>
             </button>
           )}
         </div>
@@ -217,7 +231,7 @@ function TicketsContent() {
           }`}
         >
           <Flame className="w-3.5 h-3.5" />
-          <span>Urgent Priority</span>
+          <span>Urgent</span>
         </button>
 
         <button
@@ -232,7 +246,7 @@ function TicketsContent() {
           }`}
         >
           <ClockAlert className="w-3.5 h-3.5" />
-          <span>SLA Overdue</span>
+          <span>Overdue</span>
         </button>
 
         {user.role === 'STAFF' && (
@@ -249,7 +263,7 @@ function TicketsContent() {
               }`}
             >
               <UserCheck className="w-3.5 h-3.5" />
-              <span>Assigned To Me</span>
+              <span>Mine</span>
             </button>
 
             <button
@@ -264,7 +278,7 @@ function TicketsContent() {
               }`}
             >
               <Inbox className="w-3.5 h-3.5" />
-              <span>Unclaimed Queue</span>
+              <span>Unclaimed</span>
             </button>
           </>
         )}
@@ -281,7 +295,7 @@ function TicketsContent() {
       </div>
 
       {/* Advanced Filter Controls Bar */}
-      <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
+      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row gap-3">
           {/* Search Box */}
           <div className="relative flex-1">
@@ -293,8 +307,9 @@ function TicketsContent() {
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              placeholder="Search by ticket # (TKT-2026-xxxxx), subject, or student name..."
-              className="w-full pl-10 pr-4 py-2.5 text-xs font-medium text-slate-900 bg-slate-50 border border-slate-200/80 rounded-2xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all placeholder:text-slate-400"
+              placeholder="Search by request number, subject, or student…"
+              aria-label="Search tickets"
+              className="w-full min-h-11 pl-10 pr-4 py-2.5 text-sm font-medium text-slate-900 bg-slate-50 border border-slate-200/80 rounded-xl focus:bg-white transition-all placeholder:text-slate-400"
             />
             {search && (
               <button
@@ -311,6 +326,7 @@ function TicketsContent() {
 
           {/* Sort Control */}
           <div className="flex items-center gap-2">
+            <button onClick={() => setFilterOpen((open) => !open)} className={`flex min-h-10 items-center gap-2 rounded-xl border px-3 text-xs font-bold ${filterOpen || hasActiveFilters ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-600'}`}><Filter className="h-4 w-4" />Filters</button>
             <select
               value={sortBy}
               onChange={(e) => {
@@ -322,7 +338,7 @@ function TicketsContent() {
               <option value="createdAt">Date Created</option>
               <option value="updatedAt">Last Activity</option>
               <option value="priority">Priority</option>
-              <option value="slaTargetHours">SLA Target</option>
+              <option value="slaDueAt">SLA deadline</option>
             </select>
 
             <button
@@ -339,7 +355,7 @@ function TicketsContent() {
         </div>
 
         {/* Category & Status Filter Selectors */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-slate-100">
+        {filterOpen && <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-slate-100">
           <div>
             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
               Category
@@ -424,7 +440,7 @@ function TicketsContent() {
               <option value="BREACHED">Breached (Resolved Late)</option>
             </select>
           </div>
-        </div>
+        </div>}
       </div>
 
       {error && (

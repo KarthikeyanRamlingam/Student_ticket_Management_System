@@ -158,6 +158,19 @@ export class TicketService {
       where.departmentId = query.departmentId;
     }
 
+    // Apply SLA filters in SQL so pagination totals stay correct and the API
+    // does not fetch rows only to discard them in memory.
+    if (query.slaStatus === 'OVERDUE') {
+      const activeStatuses = [
+        TicketStatus.OPEN,
+        TicketStatus.ASSIGNED,
+        TicketStatus.IN_PROGRESS,
+        TicketStatus.WAITING_FOR_STUDENT,
+        TicketStatus.REOPENED
+      ];
+      where.AND = [{ status: { in: activeStatuses }, slaDueAt: { lt: new Date() } }];
+    }
+
     // 3. Search Filter (Ticket Number, Title, Description, or Student Name)
     if (query.search && query.search.trim()) {
       const term = query.search.trim();
@@ -217,7 +230,7 @@ export class TicketService {
     });
 
     // 7. In-memory filter for slaStatus if requested
-    if (query.slaStatus) {
+    if (query.slaStatus && query.slaStatus !== 'OVERDUE') {
       enrichedTickets = enrichedTickets.filter((t) => t.metrics.slaStatus === query.slaStatus);
     }
 

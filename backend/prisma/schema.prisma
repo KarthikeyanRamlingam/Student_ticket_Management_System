@@ -189,6 +189,10 @@ model Ticket {
   @@index([categoryId])
   @@index([createdAt])
   @@index([slaDueAt])
+  @@index([studentId, createdAt])
+  @@index([assignedStaffId, status, slaDueAt])
+  @@index([departmentId, status, createdAt])
+  @@index([status, slaDueAt])
 }
 
 model TicketComment {

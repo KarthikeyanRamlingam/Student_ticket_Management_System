@@ -1,209 +1,88 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
-import {
-  GraduationCap,
-  Briefcase,
-  Shield,
-  ArrowRight,
-  AlertCircle,
-  Loader2,
-  Sparkles
-} from 'lucide-react';
+import { GraduationCap, ArrowRight, AlertCircle, Loader2, Eye, EyeOff, CheckCircle2, Users, Clock3, ShieldCheck } from 'lucide-react';
+
+const demoAccounts = [
+  { label: 'Student', detail: 'Submit and track requests', email: 'student@campusresolve.demo', password: 'Student@123', tone: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  { label: 'Support staff', detail: 'Triage and resolve tickets', email: 'staff@campusresolve.demo', password: 'Staff@123', tone: 'bg-sky-50 text-sky-700 border-sky-200' },
+  { label: 'Administrator', detail: 'Manage campus operations', email: 'admin@campusresolve.demo', password: 'Admin@123', tone: 'bg-violet-50 text-violet-700 border-violet-200' }
+];
 
 export default function LoginPage() {
   const router = useRouter();
   const { login, user } = useAuth();
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (user) {
-      router.push('/dashboard');
-    }
-  }, [user, router]);
+  useEffect(() => { if (user) router.replace('/dashboard'); }, [user, router]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const signIn = async (nextEmail: string, nextPassword: string) => {
     setError(null);
     setLoading(true);
     try {
-      await login(email, password);
-      router.push('/dashboard');
-    } catch (err: any) {
-      setError(err.message || 'Login failed. Please check your credentials.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleQuickLogin = async (demoEmail: string, demoPass: string) => {
-    setError(null);
-    setLoading(true);
-    setEmail(demoEmail);
-    setPassword(demoPass);
-    try {
-      await login(demoEmail, demoPass);
-      router.push('/dashboard');
-    } catch (err: any) {
-      setError(err.message || 'Demo login failed.');
+      await login(nextEmail, nextPassword);
+      router.replace('/dashboard');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'We could not sign you in. Check your details and try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
-      {/* Background Glow */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-600/20 blur-[120px] rounded-full pointer-events-none" />
-
-      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 to-blue-500 flex items-center justify-center text-white mx-auto shadow-xl shadow-indigo-600/30 mb-4">
-          <GraduationCap className="w-7 h-7" />
-        </div>
-        <h1 className="text-2xl font-bold tracking-tight text-white">
-          Sign In to CampusResolve
-        </h1>
-        <p className="mt-1 text-xs text-slate-400">
-          Student Support, SLA Tracking & Ticket Resolution Portal
-        </p>
-      </div>
-
-      <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-xl relative z-10 px-4 sm:px-0">
-        <div className="bg-slate-800/80 backdrop-blur-xl border border-slate-700 rounded-3xl p-6 sm:p-8 shadow-2xl">
-          {/* Quick Demo Switcher Banner */}
-          <div className="mb-6 p-4 rounded-2xl bg-indigo-950/60 border border-indigo-500/30">
-            <div className="flex items-center gap-2 mb-2 text-indigo-300 font-semibold text-xs">
-              <Sparkles className="w-4 h-4 text-indigo-400" />
-              <span>Recruiter & Interview 1-Click Demo Accounts</span>
-            </div>
-            <p className="text-[11px] text-slate-400 mb-3">
-              Click any role to test authentic role-based permissions and workflows:
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('student@campusresolve.demo', 'Student@123')}
-                className="p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-900 border border-slate-700 hover:border-emerald-500/50 text-left transition-all group flex items-center justify-between"
-              >
-                <div>
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-white group-hover:text-emerald-400">
-                    <GraduationCap className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Aarav (Student)</span>
-                  </div>
-                  <div className="text-[10px] text-slate-400">STU-2024-001 • Own tickets</div>
-                </div>
-                <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('staff@campusresolve.demo', 'Staff@123')}
-                className="p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-900 border border-slate-700 hover:border-blue-500/50 text-left transition-all group flex items-center justify-between"
-              >
-                <div>
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-white group-hover:text-blue-400">
-                    <Briefcase className="w-3.5 h-3.5 text-blue-400" />
-                    <span>Priya (Staff - Finance)</span>
-                  </div>
-                  <div className="text-[10px] text-slate-400">Claims, internal notes, SLA</div>
-                </div>
-                <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-blue-400" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('staff.it@campusresolve.demo', 'Staff@123')}
-                className="p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-900 border border-slate-700 hover:border-indigo-500/50 text-left transition-all group flex items-center justify-between"
-              >
-                <div>
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-white group-hover:text-indigo-400">
-                    <Briefcase className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>Rahul (Staff - IT)</span>
-                  </div>
-                  <div className="text-[10px] text-slate-400">IT & urgent blockers</div>
-                </div>
-                <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-indigo-400" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('admin@campusresolve.demo', 'Admin@123')}
-                className="p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-900 border border-slate-700 hover:border-purple-500/50 text-left transition-all group flex items-center justify-between"
-              >
-                <div>
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-white group-hover:text-purple-400">
-                    <Shield className="w-3.5 h-3.5 text-purple-400" />
-                    <span>Dr. Rajesh (Admin)</span>
-                  </div>
-                  <div className="text-[10px] text-slate-400">Executive dashboard & all queues</div>
-                </div>
-                <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-purple-400" />
-              </button>
+    <main className="min-h-screen bg-slate-50 p-3 sm:p-6 lg:p-8">
+      <div className="mx-auto grid min-h-[calc(100vh-1.5rem)] max-w-6xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_25px_80px_rgba(15,23,42,.12)] sm:min-h-[calc(100vh-3rem)] lg:grid-cols-[1.05fr_.95fr]">
+        <section className="relative hidden overflow-hidden bg-slate-950 p-10 text-white lg:flex lg:flex-col lg:justify-between">
+          <div className="absolute -right-24 top-12 h-80 w-80 rounded-full bg-indigo-500/25 blur-3xl" />
+          <div className="relative flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-500"><GraduationCap className="h-6 w-6" /></div>
+            <div><p className="font-extrabold tracking-tight">CampusResolve</p><p className="text-xs text-slate-400">One place for campus support</p></div>
+          </div>
+          <div className="relative max-w-lg">
+            <span className="rounded-full border border-indigo-400/25 bg-indigo-400/10 px-3 py-1 text-xs font-bold text-indigo-200">Built for students and campus teams</span>
+            <h1 className="mt-5 text-4xl font-extrabold leading-tight tracking-tight">Get help without chasing offices or losing track.</h1>
+            <p className="mt-4 max-w-md text-sm leading-6 text-slate-300">Send your request to the right department, follow every update, and know exactly when to expect a response.</p>
+            <div className="mt-8 grid grid-cols-3 gap-3">
+              {[{ label: 'Clear ownership', Icon: Users }, { label: 'SLA tracking', Icon: Clock3 }, { label: 'Private by design', Icon: ShieldCheck }].map(({ label, Icon }) => (
+                <div key={label} className="rounded-2xl border border-white/10 bg-white/5 p-3"><Icon className="mb-3 h-5 w-5 text-indigo-300" /><p className="text-xs font-bold">{label}</p></div>
+              ))}
             </div>
           </div>
+          <p className="relative text-xs text-slate-500">Fast, transparent support for the whole campus community.</p>
+        </section>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
-                Email Address
-              </label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@campusresolve.demo"
-                className="w-full px-3.5 py-2.5 text-sm bg-slate-900/90 border border-slate-700 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-slate-500"
-              />
+        <section className="flex items-center justify-center p-5 sm:p-10 lg:p-12">
+          <div className="w-full max-w-md">
+            <div className="mb-8 lg:hidden">
+              <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-200"><GraduationCap className="h-6 w-6" /></div>
+              <p className="font-extrabold text-slate-900">CampusResolve</p>
             </div>
+            <h2 className="text-2xl font-extrabold tracking-tight text-slate-950">Welcome back</h2>
+            <p className="mt-2 text-sm text-slate-500">Sign in with your campus account to continue.</p>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
-                Password
-              </label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-3.5 py-2.5 text-sm bg-slate-900/90 border border-slate-700 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-slate-500"
-              />
+            {error && <div role="alert" className="mt-5 flex gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{error}</div>}
+
+            <form className="mt-7 space-y-5" onSubmit={(event) => { event.preventDefault(); signIn(email.trim(), password); }}>
+              <div><label htmlFor="email" className="mb-2 block text-sm font-bold text-slate-700">Email address</label><input id="email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@campus.edu" className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm shadow-sm placeholder:text-slate-400 focus:border-indigo-500" /></div>
+              <div><label htmlFor="password" className="mb-2 block text-sm font-bold text-slate-700">Password</label><div className="relative"><input id="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 pr-12 text-sm shadow-sm placeholder:text-slate-400 focus:border-indigo-500" /><button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div></div>
+              <button disabled={loading} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-bold text-white shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60">{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}{loading ? 'Signing in…' : 'Sign in'}</button>
+            </form>
+
+            <div className="my-7 flex items-center gap-3"><div className="h-px flex-1 bg-slate-200" /><span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Explore the demo</span><div className="h-px flex-1 bg-slate-200" /></div>
+            <div className="grid gap-2">
+              {demoAccounts.map((account) => <button key={account.email} disabled={loading} onClick={() => { setEmail(account.email); setPassword(account.password); signIn(account.email, account.password); }} className={`flex min-h-12 items-center justify-between rounded-xl border px-3.5 text-left transition-transform hover:-translate-y-0.5 ${account.tone}`}><span><span className="block text-xs font-extrabold">{account.label}</span><span className="text-[11px] opacity-75">{account.detail}</span></span><CheckCircle2 className="h-4 w-4" /></button>)}
             </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full mt-2 py-3 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
-            >
-              {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              <span>{loading ? 'Authenticating...' : 'Sign In'}</span>
-            </button>
-          </form>
-
-          <div className="mt-6 pt-4 border-t border-slate-700/80 text-center text-xs text-slate-400">
-            <span>New student? </span>
-            <Link href="/register" className="font-semibold text-indigo-400 hover:text-indigo-300">
-              Register Student Account
-            </Link>
+            <p className="mt-7 text-center text-sm text-slate-500">New student? <Link href="/register" className="font-bold text-indigo-600 hover:text-indigo-700">Create your account</Link></p>
           </div>
-        </div>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }
